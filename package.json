@@ -1,0 +1,22 @@
+{
+  "name": "cmpx",
+  "version": "0.9.2",
+  "description": "vm",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmpxs/cmpx.git"
+  },
+  "keywords": [
+    "cmpx"
+  ],
+  "author": "cmpxs",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cmpxs/cmpx/issues"
+  },
+  "homepage": "https://github.com/cmpxs/cmpx#readme"
+}
