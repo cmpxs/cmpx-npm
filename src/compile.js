@@ -122,10 +122,10 @@ _forAttrRegex = /\s*([^\s]+)\s*\in\s*([^\s]+)\s*/i, _getForAttrInfos = function 
             }
         }];
     return attrs;
-}, _bindTypeRegex = /^\s*([\<\>\:\@\#])\s*(.*)/, _removeEmptySplitRegex = /^['"]{2,2}\+|\+['"]{2,2}/g, 
+}, _bindTypeRegex = /^\s*([\<\>\:\@\#])\s*(.*)/, _removeEmptySplitRegex = /^['"]{2,2}\+|\+['"]{2,2}/g, _onlyBindRegex = /^\$\(\$[^$]*\$\)\$$/, 
 //获取内容绑定信息，如 name="aaa{{this.name}}"
 _getBind = function (value, split) {
-    var write, event, onceList = [], read = false, isOnce = false;
+    var write, event, onceList = [], read = false, isOnce = false, onlyBing = _onlyBindRegex.test(value), readTxt;
     var type = '', txt, reg, readContent = [split, value.replace(_cmdDecodeAttrRegex, function (find, content, index) {
             content = decodeURIComponent(content);
             reg = _bindTypeRegex.exec(content);
@@ -137,12 +137,12 @@ _getBind = function (value, split) {
                 type = '';
                 txt = content;
             }
-            var readTxt = '';
+            readTxt = '';
             switch (type) {
                 case ':':
                     onceList.push(txt);
                     isOnce = true;
-                    readTxt = [split, 'once' + (onceList.length - 1), split].join('+');
+                    readTxt = onlyBing ? 'once0' : [split, 'once' + (onceList.length - 1), split].join('+');
                     break;
                 case '@':
                     event = txt;
@@ -155,22 +155,21 @@ _getBind = function (value, split) {
                 case '<': //只读
                 default:
                     read = true;
-                    readTxt = [split, 'CmpxLib.toStr(' + txt + ')', split].join('+');
+                    readTxt = onlyBing ? txt : [split, 'CmpxLib.toStr(' + txt + ')', split].join('+');
                     break;
             }
             return readTxt;
         }), split].join('');
+    if (onlyBing) {
+        readContent = isOnce ? 'once0' : readTxt;
+    }
     readContent = readContent.replace(_removeEmptySplitRegex, '');
-    // if (isSingeBind)
-    //     readContent = readContent.replace(_removeEmptySplitRegex, '');
-    //     //readContent = readContentSg;
-    // if (isSingeBind) console.log('isSingeBind', readContent);
     var once;
     if (write || read || isOnce || onceList.length > 0) {
         if (isOnce) {
             var oList_1 = [];
             CmpxLib.each(onceList, function (item, index) {
-                oList_1.push(['once', index, ' = CmpxLib.toStr(', item, ')'].join(''));
+                oList_1.push(['once', index, ' = ', onlyBing ? item : 'CmpxLib.toStr(', item, ')'].join(''));
             });
             once = 'var ' + oList_1.join(',') + ';';
         }
@@ -222,6 +221,7 @@ export function VM(vm) {
     return function (constructor) {
         _registerVM[vm.name] = {
             render: null,
+            vm: vm,
             componetDef: constructor
         };
         var rdF = function () {
@@ -727,11 +727,12 @@ var Compile = (function () {
                         componet.$updateAsync();
                     }
                 };
-                var attrDef_1 = HtmlDef.getHtmlAttrDef(name);
+                var attrDef_1 = HtmlDef.getHtmlAttrDef(name), writeEvent_1 = attrDef_1.writeEvent || ['change', 'click'];
                 if (isWrite_2) {
                     eventDef_2 = HtmlDef.getHtmlEventDef(name);
-                    eventDef_2.addEventListener(element, 'change', writeFn_2, false);
-                    eventDef_2.addEventListener(element, 'click', writeFn_2, false);
+                    CmpxLib.each(writeEvent_1, function (item) {
+                        eventDef_2.addEventListener(element, item, writeFn_2, false);
+                    });
                 }
                 subject.subscribe({
                     update: function (p) {
@@ -745,8 +746,9 @@ var Compile = (function () {
                     },
                     remove: function (p) {
                         if (isWrite_2) {
-                            eventDef_2.removeEventListener(element, 'change', writeFn_2, false);
-                            eventDef_2.removeEventListener(element, 'click', writeFn_2, false);
+                            CmpxLib.each(writeEvent_1, function (item) {
+                                eventDef_2.removeEventListener(element, item, writeFn_2, false);
+                            });
                         }
                     }
                 });

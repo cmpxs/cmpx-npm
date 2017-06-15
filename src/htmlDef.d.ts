@@ -54,8 +54,8 @@ export declare const SINGLE_TAG: HtmlTagDef, DEFULE_TAG: HtmlTagDef;
  */
 export interface IHtmlAttrDef {
     setAttribute: (element: HTMLElement, name: string, value: string, subName?: string) => void;
-    getAttribute: (element: HTMLElement, name: string, subName?: string) => string;
-    writeable: boolean;
+    getAttribute: (element: HTMLElement, name: string, subName?: string) => any;
+    writeEvent?: string[];
 }
 /**
  * 默认HtmlAttr定义

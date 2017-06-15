@@ -2,6 +2,7 @@ import { ICreateElementAttr } from './htmlDef';
 import { Componet } from './componet';
 export interface IVMConfig {
     name: string;
+    include?: any[];
     tmpl?: string | Function;
     tmplUrl?: string | Function;
     style?: string;

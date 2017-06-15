@@ -86,15 +86,14 @@ export var DEFAULT_ATTR = {
         if (subName)
             element[name][subName] = value;
         else
-            element.setAttribute(name, value);
+            element.setAttribute(name, CmpxLib.toStr(value));
     },
     getAttribute: function (element, name, subName) {
         if (subName)
             return element[name][subName];
         else
             return element.getAttribute(name);
-    },
-    writeable: false
+    }
 };
 /**
  * 默认HtmlAttr prop定义
@@ -102,17 +101,16 @@ export var DEFAULT_ATTR = {
 export var DEFAULT_ATTR_PROP = {
     setAttribute: function (element, name, value, subName) {
         if (subName)
-            element[name][subName] = value;
+            element[name][subName] = name == 'value' ? CmpxLib.toStr(value) : value;
         else
-            element[name] = value;
+            element[name] = name == 'value' ? CmpxLib.toStr(value) : value;
     },
     getAttribute: function (element, name, subName) {
         if (subName)
             return element[name][subName];
         else
             return element[name];
-    },
-    writeable: true
+    }
 };
 var _htmlAttrDefConfig = {
     'src': DEFAULT_ATTR_PROP,

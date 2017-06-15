@@ -296,15 +296,14 @@ var DEFAULT_ATTR = {
         if (subName)
             element[name][subName] = value;
         else
-            element.setAttribute(name, value);
+            element.setAttribute(name, CmpxLib.toStr(value));
     },
     getAttribute: function (element, name, subName) {
         if (subName)
             return element[name][subName];
         else
             return element.getAttribute(name);
-    },
-    writeable: false
+    }
 };
 /**
  * 默认HtmlAttr prop定义
@@ -312,17 +311,16 @@ var DEFAULT_ATTR = {
 var DEFAULT_ATTR_PROP = {
     setAttribute: function (element, name, value, subName) {
         if (subName)
-            element[name][subName] = value;
+            element[name][subName] = name == 'value' ? CmpxLib.toStr(value) : value;
         else
-            element[name] = value;
+            element[name] = name == 'value' ? CmpxLib.toStr(value) : value;
     },
     getAttribute: function (element, name, subName) {
         if (subName)
             return element[name][subName];
         else
             return element[name];
-    },
-    writeable: true
+    }
 };
 var _htmlAttrDefConfig = {
     'src': DEFAULT_ATTR_PROP,
@@ -544,8 +542,9 @@ var _getForAttrInfos = function (content) {
 };
 var _bindTypeRegex = /^\s*([\<\>\:\@\#])\s*(.*)/;
 var _removeEmptySplitRegex = /^['"]{2,2}\+|\+['"]{2,2}/g;
+var _onlyBindRegex = /^\$\(\$[^$]*\$\)\$$/;
 var _getBind = function (value, split) {
-    var write, event, onceList = [], read = false, isOnce = false;
+    var write, event, onceList = [], read = false, isOnce = false, onlyBing = _onlyBindRegex.test(value), readTxt;
     var type = '', txt, reg, readContent = [split, value.replace(_cmdDecodeAttrRegex, function (find, content, index) {
             content = decodeURIComponent(content);
             reg = _bindTypeRegex.exec(content);
@@ -557,12 +556,12 @@ var _getBind = function (value, split) {
                 type = '';
                 txt = content;
             }
-            var readTxt = '';
+            readTxt = '';
             switch (type) {
                 case ':':
                     onceList.push(txt);
                     isOnce = true;
-                    readTxt = [split, 'once' + (onceList.length - 1), split].join('+');
+                    readTxt = onlyBing ? 'once0' : [split, 'once' + (onceList.length - 1), split].join('+');
                     break;
                 case '@':
                     event = txt;
@@ -575,22 +574,21 @@ var _getBind = function (value, split) {
                 case '<': //只读
                 default:
                     read = true;
-                    readTxt = [split, 'CmpxLib.toStr(' + txt + ')', split].join('+');
+                    readTxt = onlyBing ? txt : [split, 'CmpxLib.toStr(' + txt + ')', split].join('+');
                     break;
             }
             return readTxt;
         }), split].join('');
+    if (onlyBing) {
+        readContent = isOnce ? 'once0' : readTxt;
+    }
     readContent = readContent.replace(_removeEmptySplitRegex, '');
-    // if (isSingeBind)
-    //     readContent = readContent.replace(_removeEmptySplitRegex, '');
-    //     //readContent = readContentSg;
-    // if (isSingeBind) console.log('isSingeBind', readContent);
     var once;
     if (write || read || isOnce || onceList.length > 0) {
         if (isOnce) {
             var oList_1 = [];
             CmpxLib.each(onceList, function (item, index) {
-                oList_1.push(['once', index, ' = CmpxLib.toStr(', item, ')'].join(''));
+                oList_1.push(['once', index, ' = ', onlyBing ? item : 'CmpxLib.toStr(', item, ')'].join(''));
             });
             once = 'var ' + oList_1.join(',') + ';';
         }
@@ -648,6 +646,7 @@ function VM(vm) {
     return function (constructor) {
         _registerVM[vm.name] = {
             render: null,
+            vm: vm,
             componetDef: constructor
         };
         var rdF = function () {
@@ -1163,11 +1162,12 @@ var Compile = (function () {
                         componet.$updateAsync();
                     }
                 };
-                var attrDef_1 = HtmlDef.getHtmlAttrDef(name);
+                var attrDef_1 = HtmlDef.getHtmlAttrDef(name), writeEvent_1 = attrDef_1.writeEvent || ['change', 'click'];
                 if (isWrite_2) {
                     eventDef_2 = HtmlDef.getHtmlEventDef(name);
-                    eventDef_2.addEventListener(element, 'change', writeFn_2, false);
-                    eventDef_2.addEventListener(element, 'click', writeFn_2, false);
+                    CmpxLib.each(writeEvent_1, function (item) {
+                        eventDef_2.addEventListener(element, item, writeFn_2, false);
+                    });
                 }
                 subject.subscribe({
                     update: function (p) {
@@ -1181,8 +1181,9 @@ var Compile = (function () {
                     },
                     remove: function (p) {
                         if (isWrite_2) {
-                            eventDef_2.removeEventListener(element, 'change', writeFn_2, false);
-                            eventDef_2.removeEventListener(element, 'click', writeFn_2, false);
+                            CmpxLib.each(writeEvent_1, function (item) {
+                                eventDef_2.removeEventListener(element, item, writeFn_2, false);
+                            });
                         }
                     }
                 });
@@ -1706,11 +1707,24 @@ var _htmlConfig = function () {
         'title': _rawTag,
         'textarea': _rawTag
     });
+    var modelChecked = /radio|checkbox/i;
     //扩展attr, 如果不支持请在这里扩展
     HtmlDef.extendHtmlAttrDef({
         'name': DEFAULT_ATTR,
         'value': DEFAULT_ATTR_PROP,
-        'type': DEFAULT_ATTR_PROP
+        'type': DEFAULT_ATTR_PROP,
+        'model': {
+            setAttribute: function (element, name, value, subName) {
+                if (modelChecked.test(element['type']))
+                    element['checked'] = element['value'] == value;
+                else
+                    element['value'] = CmpxLib.toStr(value);
+            },
+            getAttribute: function (element, name, subName) {
+                return !modelChecked.test(element['type']) || element['checked'] ? element['value'] : '';
+            },
+            writeEvent: ['change', 'click']
+        }
     });
     //扩展事件处理, 如果不支持请在这里扩展
     HtmlDef.extendHtmlEventDef({

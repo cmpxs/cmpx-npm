@@ -48,11 +48,24 @@ var _htmlConfig = function () {
         'title': _rawTag,
         'textarea': _rawTag
     });
+    var modelChecked = /radio|checkbox/i;
     //扩展attr, 如果不支持请在这里扩展
     HtmlDef.extendHtmlAttrDef({
         'name': DEFAULT_ATTR,
         'value': DEFAULT_ATTR_PROP,
-        'type': DEFAULT_ATTR_PROP
+        'type': DEFAULT_ATTR_PROP,
+        'model': {
+            setAttribute: function (element, name, value, subName) {
+                if (modelChecked.test(element['type']))
+                    element['checked'] = element['value'] == value;
+                else
+                    element['value'] = CmpxLib.toStr(value);
+            },
+            getAttribute: function (element, name, subName) {
+                return !modelChecked.test(element['type']) || element['checked'] ? element['value'] : '';
+            },
+            writeEvent: ['change', 'click']
+        }
     });
     //扩展事件处理, 如果不支持请在这里扩展
     HtmlDef.extendHtmlEventDef({
