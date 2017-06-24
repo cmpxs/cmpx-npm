@@ -1,4 +1,6 @@
-import { CompileRender } from './compile';
+"use strict";
+exports.__esModule = true;
+var compile_1 = require("./compile");
 var Componet = (function () {
     function Componet() {
         this.$children = [];
@@ -45,7 +47,7 @@ var Componet = (function () {
      * @param p 传入模板参数
      */
     Componet.prototype.$render = function (tmpl, p) {
-        var rd = new CompileRender(tmpl, null, p);
+        var rd = new compile_1.CompileRender(tmpl, null, p);
         return rd;
     };
     /**
@@ -54,14 +56,6 @@ var Componet = (function () {
      * @param p 传入的参数
      */
     Componet.prototype.onInit = function (cb, p) {
-        cb && cb();
-    };
-    /**
-     * 准备好Viewvar后, 在onInit之后、onReady之前触发
-     * @param cb 处理完成后，通知继续处理
-     * @param p 传入的参数
-     */
-    Componet.prototype.onInitViewvar = function (cb, p) {
         cb && cb();
     };
     /**
@@ -93,5 +87,5 @@ var Componet = (function () {
     };
     return Componet;
 }());
-export { Componet };
+exports.Componet = Componet;
 //# sourceMappingURL=componet.js.map

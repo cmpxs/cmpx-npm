@@ -1,4 +1,4 @@
-export default class CmpxEvent {
+export declare class CmpxEvent {
     private events;
     /**
      * 绑定事件
@@ -15,5 +15,5 @@ export default class CmpxEvent {
      * @param args 触发传入参数
      * @param thisArg this对象
      */
-    trigger(args: any[], thisArg: any): any;
+    trigger(args: any[], thisArg?: any): any;
 }

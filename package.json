@@ -1,6 +1,6 @@
 {
   "name": "cmpx",
-  "version": "0.9.2",
+  "version": "1.0.0-deta",
   "description": "vm",
   "main": "index.js",
   "scripts": {

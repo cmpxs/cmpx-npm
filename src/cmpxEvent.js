@@ -1,4 +1,6 @@
-import CmpxLib from './cmpxLib';
+"use strict";
+exports.__esModule = true;
+var cmpxLib_1 = require("./cmpxLib");
 var CmpxEvent = (function () {
     function CmpxEvent() {
         this.events = [];
@@ -16,7 +18,7 @@ var CmpxEvent = (function () {
      */
     CmpxEvent.prototype.off = function (fn) {
         if (fn) {
-            var index = CmpxLib.inArray(this.events, fn);
+            var index = cmpxLib_1["default"].inArray(this.events, fn);
             index >= 0 && this.events.splice(index, 1);
         }
         else
@@ -29,13 +31,13 @@ var CmpxEvent = (function () {
      */
     CmpxEvent.prototype.trigger = function (args, thisArg) {
         var ret;
-        CmpxLib.each(this.events, function (item) {
-            ret = item && this.apply(thisArg, args);
+        cmpxLib_1["default"].each(this.events, function (item) {
+            ret = item && item.apply(thisArg, args);
             return ret;
         });
         return ret;
     };
     return CmpxEvent;
 }());
-export default CmpxEvent;
+exports.CmpxEvent = CmpxEvent;
 //# sourceMappingURL=cmpxEvent.js.map

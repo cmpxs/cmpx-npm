@@ -13,7 +13,6 @@ export default class CmpxLib {
     static isNumeric(n: any): boolean;
     static isString(obj: any): boolean;
     static isObject(obj: any): boolean;
-    static tryCatch(tryFn: Function, catchFn: (e: any) => any, args?: Array<any>, thisArg?: any): any;
     static isPlainObject(obj: any): any;
     static encodeHtml(html: string): string;
     static decodeHtml(html: string): string;

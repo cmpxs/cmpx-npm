@@ -86,6 +86,7 @@ export interface IHtmlEventDefConfig {
     [name: string]: IHtmlEventDef;
 }
 export declare class HtmlDef {
+    static getParentElement(node: Node): HTMLElement;
     /**
      * 获取标签定义
      * @param tagName 标签名称

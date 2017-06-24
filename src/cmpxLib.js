@@ -1,3 +1,5 @@
+"use strict";
+exports.__esModule = true;
 var stringEmpty = "", toString = Object.prototype.toString, core_hasOwn = Object.prototype.hasOwnProperty, noop = function () { }, slice = Array.prototype.slice;
 function testObject(obj) {
     if (obj.constructor &&
@@ -51,16 +53,13 @@ var CmpxLib = (function () {
         return obj && CmpxLib.isType("Object", obj)
             && !CmpxLib.isElement(obj) && !CmpxLib.isWindow(obj); //IE8以下isElement, isWindow认为Object
     };
-    CmpxLib.tryCatch = function (tryFn, catchFn, args, thisArg) {
-        if (args === void 0) { args = []; }
-        if (thisArg === void 0) { thisArg = null; }
-        try {
-            return tryFn.apply(thisArg, args);
-        }
-        catch (e) {
-            return catchFn.call(thisArg, e);
-        }
-    };
+    // static tryCatch(tryFn: Function, catchFn: (e: any) => any, args: Array<any> = [], thisArg: any = null): any {
+    //     try {
+    //         return tryFn.apply(thisArg, args);
+    //     } catch (e) {
+    //         return catchFn.call(thisArg, e);
+    //     }
+    // }
     CmpxLib.isPlainObject = function (obj) {
         if (!CmpxLib.isObject(obj))
             return false;
@@ -149,13 +148,13 @@ var CmpxLib = (function () {
     };
     CmpxLib.extend = function (obj, p) {
         if (obj && p) {
-            CmpxLib.eachProp(p, function (item, name) { return obj[name] = item; });
+            CmpxLib.eachProp(p, function (item, name) { obj[name] = item; });
         }
         return obj;
     };
     return CmpxLib;
 }());
-export default CmpxLib;
 CmpxLib.stringEmpty = stringEmpty;
 CmpxLib.noop = noop;
+exports["default"] = CmpxLib;
 //# sourceMappingURL=cmpxLib.js.map

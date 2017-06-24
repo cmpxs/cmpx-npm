@@ -1,3 +1,4 @@
+"use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
         ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
@@ -8,23 +9,21 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-import Platform from './platform';
-import { Compile } from './compile';
-import { HtmlDef, HtmlTagDef, DEFULE_TAG, DEFAULT_ATTR, DEFAULT_ATTR_PROP, DEFAULT_EVENT_DEF, SINGLE_TAG } from './htmlDef';
-import CmpxLib from './cmpxLib';
-var _getParentElement = function (element) {
-    return element.parentElement || element.parentNode;
-}, _setAttribute = function (element, attrs) {
-    CmpxLib.each(attrs, function (item) {
-        HtmlDef.getHtmlAttrDef(item.name).setAttribute(element, item.name, item.value, item.subName);
+exports.__esModule = true;
+var platform_1 = require("./platform");
+var compile_1 = require("./compile");
+var htmlDef_1 = require("./htmlDef");
+var cmpxLib_1 = require("./cmpxLib");
+var _getParentElement = htmlDef_1.HtmlDef.getParentElement, _setAttribute = function (element, attrs) {
+    cmpxLib_1["default"].each(attrs, function (item) {
+        htmlDef_1.HtmlDef.getHtmlAttrDef(item.name).setAttribute(element, item.name, item.value, item.subName);
     });
 }, _htmlTtype = /script|style/i, _createElementRaw = function (name, attrs, parent, content) {
     var element = document.createElement(name);
     element[_htmlTtype.test(name) ? 'innerHTML' : 'innerText'] = content || "";
     _setAttribute(element, attrs);
     return element;
-};
-var _rawTag = new HtmlTagDef({
+}, _rawTag = new htmlDef_1.HtmlTagDef({
     //不解释内容，在createElement创建器传入content内容
     raw: true,
     //单行tag
@@ -37,12 +36,12 @@ var _rawTag = new HtmlTagDef({
  */
 var _htmlConfig = function () {
     //扩展tag, 如果不支持请在这里扩展
-    HtmlDef.extendHtmlTagDef({
+    htmlDef_1.HtmlDef.extendHtmlTagDef({
         //默认不支持svg, 请处理HtmlTagDef的createElement参数
-        'svg': DEFULE_TAG,
+        'svg': htmlDef_1.DEFULE_TAG,
         //默认不支持math, 请处理HtmlTagDef的createElement参数
-        'math': DEFULE_TAG,
-        'br': SINGLE_TAG,
+        'math': htmlDef_1.DEFULE_TAG,
+        'br': htmlDef_1.SINGLE_TAG,
         'style': _rawTag,
         'script': _rawTag,
         'title': _rawTag,
@@ -50,16 +49,16 @@ var _htmlConfig = function () {
     });
     var modelChecked = /radio|checkbox/i;
     //扩展attr, 如果不支持请在这里扩展
-    HtmlDef.extendHtmlAttrDef({
-        'name': DEFAULT_ATTR,
-        'value': DEFAULT_ATTR_PROP,
-        'type': DEFAULT_ATTR_PROP,
+    htmlDef_1.HtmlDef.extendHtmlAttrDef({
+        'name': htmlDef_1.DEFAULT_ATTR,
+        'value': htmlDef_1.DEFAULT_ATTR_PROP,
+        'type': htmlDef_1.DEFAULT_ATTR_PROP,
         'model': {
             setAttribute: function (element, name, value, subName) {
                 if (modelChecked.test(element['type']))
                     element['checked'] = element['value'] == value;
                 else
-                    element['value'] = CmpxLib.toStr(value);
+                    element['value'] = cmpxLib_1["default"].toStr(value);
             },
             getAttribute: function (element, name, subName) {
                 return !modelChecked.test(element['type']) || element['checked'] ? element['value'] : '';
@@ -68,15 +67,15 @@ var _htmlConfig = function () {
         }
     });
     //扩展事件处理, 如果不支持请在这里扩展
-    HtmlDef.extendHtmlEventDef({
-        "click": DEFAULT_EVENT_DEF
+    htmlDef_1.HtmlDef.extendHtmlEventDef({
+        "click": htmlDef_1.DEFAULT_EVENT_DEF
     });
     // //更改默认值，参考如下：
     // DEFAULT_EVENT_DEF.addEventListener = (element: HTMLElement, eventName: string, context: (event: any) => any, useCapture: boolean) {
     //     element.addEventListener(eventName, context, useCapture);
     //     //attachEvent
     // }
-    Compile.loadTmplCfg(function (url, cb) {
+    compile_1.Compile.loadTmplCfg(function (url, cb) {
         var xhr = new XMLHttpRequest(), headers = {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'text/plain, */*; q=0.01',
@@ -103,7 +102,7 @@ var Browser = (function (_super) {
         //htmlDef配置
         _htmlConfig();
         //编译器启动，用于htmlDef配置后
-        Compile.startUp();
+        compile_1.Compile.startUp();
         return _this;
     }
     Browser.prototype.boot = function (componetDef) {
@@ -124,7 +123,7 @@ var Browser = (function (_super) {
             window.removeEventListener('load', _ready, false);
             //注意tmplElement是Comment, 在IE里只能取到parentNode
             var parentElement = _getParentElement(bootElement);
-            Compile.renderComponet(componetDef, bootElement, function (newSubject, refComponet) {
+            compile_1.Compile.renderComponet(componetDef, bootElement, [], function (newSubject, refComponet) {
                 parentElement.removeChild(bootElement);
                 //console.log(refComponet);
                 var _unload = function () {
@@ -145,6 +144,6 @@ var Browser = (function (_super) {
         return this;
     };
     return Browser;
-}(Platform));
-export { Browser };
+}(platform_1["default"]));
+exports.Browser = Browser;
 //# sourceMappingURL=browser.js.map
