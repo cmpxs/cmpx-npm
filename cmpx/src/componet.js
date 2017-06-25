@@ -46,8 +46,8 @@ var Componet = (function () {
      * @param tmpl 模板文本
      * @param p 传入模板参数
      */
-    Componet.prototype.$render = function (tmpl, p) {
-        var rd = new compile_1.CompileRender(tmpl, null, p);
+    Componet.prototype.$render = function (tmpl) {
+        var rd = new compile_1.CompileRender(tmpl);
         return rd;
     };
     /**

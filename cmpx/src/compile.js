@@ -232,7 +232,13 @@ function VM(vm) {
         var rdF = function () {
             //_registerVM[vm.name].render = new CompileRender(vm.tmpl, constructor);
             var head = document.head;
+            if (vm.styleUrl && !cmpxLib_1["default"].isString(vm.styleUrl)) {
+                vm.style = vm.styleUrl();
+                vm.styleUrl = null;
+            }
             if (vm.style) {
+                if (!cmpxLib_1["default"].isString(vm.style))
+                    vm.style = vm.style();
                 head.appendChild(htmlDef_1.HtmlDef.getHtmlTagDef('style').createElement('style', [{
                         name: 'type', value: 'text/css'
                     }], head, vm.style));
@@ -242,7 +248,7 @@ function VM(vm) {
                         name: 'rel', value: 'stylesheet'
                     }, {
                         name: 'href', value: vm.styleUrl
-                    }], head, vm.style));
+                    }], head));
             }
             //优先tmplUrl
             var tmplUrl = vm.tmplUrl;
@@ -451,11 +457,9 @@ var CompileRender = (function () {
         if (cmpxLib_1["default"].isString(context)) {
             var tagInfos = _makeTagInfos(cmpxLib_1["default"].trim(context, true));
             fn = _buildCompileFn(tagInfos);
-            //console.log(tagInfos);
         }
         else
             fn = context;
-        //console.log(fn);
         this.contextFn = fn;
     }
     /**
@@ -534,7 +538,7 @@ var CompileRender = (function () {
                 }
             });
             var pt = cmpxLib_1["default"].extend({}, _this.param);
-            _this.contextFn.call(componet, cmpxLib_1["default"], Compile, componet, fragment, newSubject, cmpxLib_1["default"].extend(pt, param));
+            _this.contextFn.call(componet, cmpxLib_1["default"], Compile, componet, fragment, newSubject, cmpxLib_1["default"].extend(pt, param && param.call(componet)));
             childNodes = cmpxLib_1["default"].toArray(fragment.childNodes);
             newSubject.update({
                 componet: componet
@@ -901,6 +905,14 @@ var Compile = (function () {
             }
         });
     };
+    Compile.updateRender = function (fn, componet, element, subject) {
+        subject.subscribe({
+            update: function () {
+                fn.call(componet);
+            }
+        });
+    };
+    ;
     Compile.ifRender = function (ifFun, trueFn, falseFn, componet, parentElement, insertTemp, subject) {
         if (subject.isRemove)
             return;
@@ -952,7 +964,15 @@ var Compile = (function () {
             return;
         if (cmpxLib_1["default"].isString(context)) {
             var tmpl = _getComponetTmpl(componet, context);
-            tmpl && tmpl.call(componet, componet, parentElement, subject, param || {});
+            if (tmpl) {
+                var pTmep_1 = param.call(componet) || {};
+                subject.subscribe({
+                    update: function () {
+                        cmpxLib_1["default"].extend(pTmep_1, param.call(componet));
+                    }
+                });
+                tmpl.call(componet, componet, parentElement, subject, pTmep_1);
+            }
         }
         else {
             var render_1, preSubject_1, preComponet_1, refNode_1 = _getRefNode(parentElement);
@@ -968,6 +988,10 @@ var Compile = (function () {
                         preSubject_1 = newSubject;
                         preComponet_1 = refComponet;
                     }
+                    else
+                        preSubject_1.update({
+                            componet: preComponet_1
+                        });
                 },
                 remove: function (p) {
                     render_1 = preSubject_1 = preComponet_1 = refNode_1 = null;
@@ -991,7 +1015,7 @@ var _buildCompileFn = function (tagInfos) {
     var outList = [], varNameList = [];
     _buildCompileFnContent(tagInfos, outList, varNameList, true);
     varNameList.length > 0 && outList.unshift('var ' + varNameList.join(',') + ';');
-    outList.unshift("var __tmplRender = Compile.tmplRender,\n        __setAttributeEx = Compile.setAttributeEx, __createElementEx = Compile.createElementEx,\n        __createTextNode = Compile.createTextNode, __setViewvar = Compile.setViewvar,\n        __forRender = Compile.forRender, __ifRender = Compile.ifRender,\n        __includeRender = Compile.includeRender;");
+    outList.unshift("var __tmplRender = Compile.tmplRender,\n        __setAttributeEx = Compile.setAttributeEx, __createElementEx = Compile.createElementEx,\n        __createTextNode = Compile.createTextNode, __setViewvar = Compile.setViewvar,\n        __forRender = Compile.forRender, __ifRender = Compile.ifRender,\n        __includeRender = Compile.includeRender, __updateRender = Compile.updateRender;");
     return new Function('CmpxLib', 'Compile', 'componet', 'element', 'subject', 'param', outList.join('\n'));
 }, _buildCpFnRetRmRegex = /\s*\=\s*\[\s*\]\s*$/, _escapeStringRegex = /([\"\\])/gm, _escapeBuildString = function (s) {
     return s ? s.replace(/([\"\\])/gm, '\\$1').replace(/\n/gm, '\\n').replace(/\r/gm, '\\r') : '';
@@ -1022,18 +1046,7 @@ var _buildCompileFn = function (tagInfos) {
         names = _makeSubName(attr.name);
         outList.push('__setAttributeEx(element, "' + names[0] + '", "' + names[1] + '", ' + attr.bindInfo.content + ', componet, subject, isComponet);');
     });
-}, 
-// _buildAttrContentCP = function (attrs: Array<IAttrInfo>, outList: Array<string>) {
-//     if (!attrs) return;
-//     CmpxLib.each(attrs, function (attr: IAttrInfo, index: number) {
-//         if (attr.name == '$var') return;
-//         if (attr.bind)
-//             outList.push('__setAttributeCP(element, "' + attr.name + '", ' + attr.bindInfo.content + ', componet, subject);');
-//         else
-//             outList.push('__setAttributeCP(element, "' + attr.name + '", "' + _escapeBuildString(attr.value) + '", componet, subject);');
-//     });
-// },
-_getViewvarName = function (attrs) {
+}, _getViewvarName = function (attrs) {
     var name = { item: null, list: null }, has = false;
     cmpxLib_1["default"].each(attrs, function (attr, index) {
         if (attr.name == '$var') {
@@ -1080,30 +1093,6 @@ _getViewvarName = function (attrs) {
                     varName.item && varNameList.push(varName.item);
                     varName.list && varNameList.push(varName.list + ' = []');
                 }
-                // if (tag.componet) {
-                //     if (hasChild || hasAttr || varName) {
-                //         let { bindAttrs, stAtts } = _makeElementTag(tagName, tag.attrs);
-                //         outList.push('__createComponet("' + tagName + '", ' + JSON.stringify(stAtts) + ', componet, element, subject, function (componet, element, subject, isComponet) {');
-                //         if (varName) {
-                //             outList.push('__setViewvar(function(){');
-                //             varName.item && outList.push(varName.item + ' = this;');
-                //             varName.list && outList.push(varName.list + '.push(this);');
-                //             varName.item && outList.push('return {name:"'+varName.item+'", value:'+varName.item+'}');
-                //             varName.list && outList.push('return {name:"'+varName.list+'", value:'+varName.list+'}');
-                //             outList.push('}, function(){');
-                //             varName.item && outList.push(varName.item + ' = null;');
-                //             varName.list && outList.push('var idx = ' + varName.list + '.indexOf(this); idx >= 0 && ' + varName.list + '.splice(idx, 1);');
-                //             outList.push('}, componet, element, subject, isComponet);');
-                //         }
-                //         _buildAttrContentCP(bindAttrs, outList);
-                //         //createComponet下只能放tmpl
-                //         _buildCompileFnContent(tag.children, outList, varNameList, preInsert, ['tmpl']);
-                //         outList.push('});');
-                //     } else {
-                //         outList.push('__createComponetEx("' + tagName + '", [], componet, element, subject);');
-                //     }
-                //     preInsert = true;
-                // } else {
                 var htmlTagDef = tag.htmlTagDef, rawTag = htmlTagDef.raw, tagContent = rawTag && _getTagContent(tag);
                 //如果rawTag没有子级
                 hasChild && (hasChild = !rawTag);
@@ -1129,7 +1118,6 @@ _getViewvarName = function (attrs) {
                     outList.push('__createElementEx("' + tagName + '", [], componet, element, subject, null, "' + _escapeBuildString(tagContent) + '");');
                 }
                 preInsert = false;
-                // }
             }
             else {
                 if (tag.bind) {
@@ -1186,13 +1174,14 @@ _getViewvarName = function (attrs) {
                     var incAttr = cmpxLib_1["default"].arrayToObject(tag.attrs, 'name'), incTmpl = incAttr['tmpl'], incParam = incAttr['param'] ? incAttr['param'].value : 'null', incRender = incAttr['render'];
                     incRender && (incRender = 'function(){ return ' + incRender.value + '}');
                     var context_1 = incRender ? incRender : ('"' + (incTmpl ? _escapeBuildString(incTmpl.value) : '') + '"');
-                    outList.push('__includeRender(' + context_1 + ', componet, element, ' + _getInsertTemp(preInsert) + ', subject, ' + incParam + ');');
+                    outList.push('__includeRender(' + context_1 + ', componet, element, ' + _getInsertTemp(preInsert) + ', subject, function(){ return ' + incParam + ';});');
                     preInsert = true;
                     break;
                 case 'tmpl':
                     var tmplAttr = cmpxLib_1["default"].arrayToObject(tag.attrs, 'name'), tmplId = tmplAttr['id'], tmplLet = tmplAttr['let'];
                     outList.push('__tmplRender("' + (tmplId ? _escapeBuildString(tmplId.value) : '') + '", componet, element, subject, function (componet, element, subject, param) {');
                     tmplLet && outList.push('var ' + tmplLet.value + ';');
+                    tmplLet && outList.push('__updateRender(function(){' + tmplLet.value + '}, componet, element, subject);');
                     _buildCompileFnContent(tag.children, outList, varNameList, preInsert);
                     outList.push('});');
                     break;

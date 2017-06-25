@@ -121,11 +121,9 @@ var Browser = (function (_super) {
         var _readyName = 'DOMContentLoaded', _ready = function () {
             _doc.removeEventListener(_readyName, _ready, false);
             window.removeEventListener('load', _ready, false);
-            //注意tmplElement是Comment, 在IE里只能取到parentNode
             var parentElement = _getParentElement(bootElement);
             compile_1.Compile.renderComponet(componetDef, bootElement, [], function (newSubject, refComponet) {
                 parentElement.removeChild(bootElement);
-                //console.log(refComponet);
                 var _unload = function () {
                     window.removeEventListener('unload', _unload);
                     newSubject.remove({

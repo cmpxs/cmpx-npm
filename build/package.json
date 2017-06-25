@@ -1,0 +1,25 @@
+{
+  "name": "cmpx-build",
+  "version": "1.0.0-deta2",
+  "description": "cmpx-build",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmpxs/cmpx-npm.git"
+  },
+  "keywords": [
+    "cmpx-build"
+  ],
+  "author": "cmpxs",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cmpxs/cmpx-npm/issues"
+  },
+  "homepage": "https://github.com/cmpxs/cmpx-npm#readme",
+  "devDependencies": {
+    "cmpx": ">=1.0.0-deta1 <2.0.0"
+  }
+}

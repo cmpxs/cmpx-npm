@@ -22,7 +22,7 @@ export declare class Componet {
      * @param tmpl 模板文本
      * @param p 传入模板参数
      */
-    $render(tmpl: string, p?: Object): CompileRender;
+    $render(tmpl: string | Function): CompileRender;
     /**
      * 在解释View之前触发，一般准备数据用
      * @param cb 处理完成后，通知继续处理

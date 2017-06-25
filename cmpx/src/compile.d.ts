@@ -5,8 +5,8 @@ export interface IVMConfig {
     include?: any[];
     tmpl?: string | Function;
     tmplUrl?: string | Function;
-    style?: string;
-    styleUrl?: string;
+    style?: string | Function;
+    styleUrl?: string | Function;
 }
 /**
  * 注入组件配置信息
@@ -73,7 +73,7 @@ export declare class CompileRender {
      */
     complie(refNode: Node, attrs: ICreateElementAttr[], parentComponet?: Componet, subject?: CompileSubject, contextFn?: (component: Componet, element: HTMLElement, subject: CompileSubject, isComponet: boolean) => void, subjectExclude?: {
         [type: string]: boolean;
-    }, param?: any): {
+    }, param?: Function): {
         newSubject: CompileSubject;
         refComponet: Componet;
     };
@@ -93,8 +93,9 @@ export declare class Compile {
     static createTextNode(content: any, componet: Componet, parentElement: HTMLElement, subject: CompileSubject): Text;
     static setAttribute(element: HTMLElement, name: string, subName: string, content: any, componet: Componet, subject: CompileSubject): void;
     static forRender(dataFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, eachFn: (item: any, count: number, index: number, componet: Componet, element: HTMLElement, subject: CompileSubject) => any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, syncFn: (item: any, count: number, index: number, newList: any[]) => number): void;
+    static updateRender(fn: Function, componet: Componet, element: HTMLElement, subject: CompileSubject): void;
     static ifRender(ifFun: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, trueFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, falseFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject): void;
     static tmplRender(id: any, componet: Componet, parentElement: HTMLElement, subject: CompileSubject, contextFn: (componet: Componet, element: HTMLElement, subject: CompileSubject, param: any) => void): void;
-    static includeRender(context: any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, param: any): void;
+    static includeRender(context: any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, param: Function): void;
     static renderComponet(componetDef: any, refNode: Node, attrs: ICreateElementAttr[], complieEnd?: (newSubject: CompileSubject, refComponet: Componet) => void, parentComponet?: Componet, subject?: CompileSubject, contextFn?: (component: Componet, element: HTMLElement, subject: CompileSubject, isComponet: boolean) => void): void;
 }
