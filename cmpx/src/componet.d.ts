@@ -3,7 +3,7 @@ export declare class Componet {
     readonly $name: string;
     readonly $parent: Componet;
     readonly $children: Array<Componet>;
-    readonly $subObject: CompileSubject;
+    readonly $subject: CompileSubject;
     readonly $parentElement: HTMLElement;
     /**
      * 更新View，View与Componet数据同步

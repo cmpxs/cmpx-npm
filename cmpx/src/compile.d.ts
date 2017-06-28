@@ -27,29 +27,75 @@ export interface ISubscribeParam {
     update?: (p: ISubscribeEvent) => void;
     ready?: (p: ISubscribeEvent) => void;
     remove?: (p: ISubscribeEvent) => void;
-    isRemove?: boolean;
+    detach?: (p: ISubscribeEvent) => void;
 }
 export declare class CompileSubject {
     constructor(subject?: CompileSubject, exclude?: {
         [type: string]: boolean;
     });
     private subscribeIn(name, p);
+    /**
+     * 观察
+     * @param p 观察内容
+     */
     subscribe(p: ISubscribeParam): ISubscribeParam;
     private unSubscribeIn(name, p);
+    /**
+     * 解除观察
+     * @param p 观察内容
+     */
     unSubscribe(p: ISubscribeParam): void;
     private linkParam;
     private subject;
+    /**
+     * 解除观察Subject
+     */
     unLinkSubject(): CompileSubject;
+    /**
+     * 是否已经初始化
+     */
     isInit: boolean;
     private initList;
+    /**
+     * 发送初始化通知
+     * @param p 发送事件参数
+     */
     init(p: ISubscribeEvent): void;
     private updateList;
+    /**
+     * 发送更新通知
+     * @param p 发送事件参数
+     */
     update(p: ISubscribeEvent): void;
+    /**
+     * 是否已分离
+     */
+    isDetach: boolean;
+    private detachList;
+    /**
+     * 发送分离通知，不删除
+     * @param p 发送事件参数
+     */
+    detach(p: ISubscribeEvent): void;
+    /**
+     * 是否已经准备
+     */
     isReady: boolean;
     private readyList;
+    /**
+     * 发送准备通知
+     * @param p 发送事件参数
+     */
     ready(p: ISubscribeEvent): void;
+    /**
+     * 是否已经删除
+     */
     isRemove: boolean;
     private removeList;
+    /**
+     * 发送删除通知
+     * @param p 发送事件参数
+     */
     remove(p: ISubscribeEvent): void;
     private clear();
 }
@@ -94,8 +140,8 @@ export declare class Compile {
     static setAttribute(element: HTMLElement, name: string, subName: string, content: any, componet: Componet, subject: CompileSubject): void;
     static forRender(dataFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, eachFn: (item: any, count: number, index: number, componet: Componet, element: HTMLElement, subject: CompileSubject) => any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, syncFn: (item: any, count: number, index: number, newList: any[]) => number): void;
     static updateRender(fn: Function, componet: Componet, element: HTMLElement, subject: CompileSubject): void;
-    static ifRender(ifFun: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, trueFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, falseFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject): void;
+    static ifRender(ifFun: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, trueFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, falseFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, isX: boolean): void;
     static tmplRender(id: any, componet: Componet, parentElement: HTMLElement, subject: CompileSubject, contextFn: (componet: Componet, element: HTMLElement, subject: CompileSubject, param: any) => void): void;
-    static includeRender(context: any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, param: Function): void;
+    static includeRender(context: any, contextFn: Function, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, param: Function): void;
     static renderComponet(componetDef: any, refNode: Node, attrs: ICreateElementAttr[], complieEnd?: (newSubject: CompileSubject, refComponet: Componet) => void, parentComponet?: Componet, subject?: CompileSubject, contextFn?: (component: Componet, element: HTMLElement, subject: CompileSubject, isComponet: boolean) => void): void;
 }

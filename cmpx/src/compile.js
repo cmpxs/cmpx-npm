@@ -26,7 +26,7 @@ var _newTextContent = function (tmpl, start, end) {
     return encodeURIComponent(s).replace(/'/g, '%27');
 }, 
 //将{{this.name}}绑定标签转成$($this.name$)$
-_cmdEncodeAttrRegex = /\{\{\{((?:.|\r|\n)*?)\}\}\}|\{\{((?!\/|\s*(?:if|else|for|tmpl|include|html)[ \}])(?:.|\r|\n)+?)\}\}/gm, _makeTextTag = function (tmpl) {
+_cmdEncodeAttrRegex = /\{\{\{((?:.|\r|\n)*?)\}\}\}|\{\{((?!\/|\s*(?:if|ifx|else|for|forx|tmpl|include|html)[ \}])(?:.|\r|\n)+?)\}\}/gm, _makeTextTag = function (tmpl) {
     //
     return tmpl.replace(_cmdEncodeAttrRegex, function (find, content, content1) {
         return ['$($', _encodeURIComponentEx(content || content1), '$)$'].join('');
@@ -48,13 +48,14 @@ _tagInfoRegex = /\<\s*(\/*)\s*([^<>\s]+)\s*([^<>]*?)(\/*)\s*\>|\{\{\s*(\/*)\s*([
         if (index > lastIndex) {
             list.push(_newTextContent(tmpl, lastIndex, index));
         }
-        var cmd = !!txtName, htmlTagDef = cmd ? null : htmlDef_1.HtmlDef.getHtmlTagDef(tagName), single = !!end2 || !!txtEnd2 || (cmd ? _singleCmd[txtName] : htmlTagDef.single), end = !!end1 || !!txtEnd1 || single;
-        if (cmd || !(single && !!end1)) {
+        var cmd = !!txtName, htmlTagDef = cmd ? null : htmlDef_1.HtmlDef.getHtmlTagDef(tagName), single = !!end2 || !!txtEnd2 || (cmd ? (_singleCmd[txtName] && !!txtEnd2) : htmlTagDef.single), end = !!end1 || !!txtEnd1 || single;
+        if (!(single && (!!end1 || !!txtEnd1))) {
             var attrs = !cmd && !!tagContent ? _getAttrInfos(tagContent) : null;
             if (cmd) {
                 if ((single || !end)) {
                     switch (txtName) {
                         case 'for':
+                        case 'forx':
                             attrs = _getForAttrInfos(txtContent);
                             break;
                         case 'tmpl':
@@ -77,8 +78,8 @@ _tagInfoRegex = /\<\s*(\/*)\s*([^<>\s]+)\s*([^<>]*?)(\/*)\s*\>|\{\{\s*(\/*)\s*([
                 end: end,
                 single: single,
                 index: index,
-                htmlTagDef: htmlTagDef,
-                componet: cmd ? false : !!_registerVM[tagName]
+                htmlTagDef: htmlTagDef //,
+                //componet: cmd ? false : !!_registerVM[tagName]
             };
             list.push(item);
         }
@@ -297,8 +298,21 @@ exports.viewvar = viewvar;
 var CompileSubject = (function () {
     function CompileSubject(subject, exclude) {
         var _this = this;
+        /**
+         * 是否已经初始化
+         */
         this.isInit = false;
+        /**
+         * 是否已分离
+         */
+        this.isDetach = false;
+        /**
+         * 是否已经准备
+         */
         this.isReady = false;
+        /**
+         * 是否已经删除
+         */
         this.isRemove = false;
         if (subject) {
             if (!(this.isRemove = subject.isRemove)) {
@@ -306,6 +320,7 @@ var CompileSubject = (function () {
                     init: function (p) { return (!exclude || !exclude.init) && _this.init(p); },
                     update: function (p) { return (!exclude || !exclude.update) && _this.update(p); },
                     ready: function (p) { return (!exclude || !exclude.ready) && _this.ready(p); },
+                    detach: function (p) { return (!exclude || !exclude.detach) && _this.detach(p); },
                     remove: function (p) { return (!exclude || !exclude.remove) && _this.remove(p); }
                 });
                 this.subject = subject;
@@ -318,11 +333,16 @@ var CompileSubject = (function () {
         var listName = name + 'List', list = this[listName] || (this[listName] = []);
         list.push(p[name]);
     };
+    /**
+     * 观察
+     * @param p 观察内容
+     */
     CompileSubject.prototype.subscribe = function (p) {
         if (!this.isRemove) {
             p.update && this.subscribeIn('update', p);
             p.ready && this.subscribeIn('ready', p);
             p.remove && this.subscribeIn('remove', p);
+            p.detach && this.subscribeIn('detach', p);
             if (this.ready)
                 p.ready && p.ready(null);
             else
@@ -341,18 +361,30 @@ var CompileSubject = (function () {
             (index >= 0) && list.splice(index, 1);
         }
     };
+    /**
+     * 解除观察
+     * @param p 观察内容
+     */
     CompileSubject.prototype.unSubscribe = function (p) {
         if (!this.isRemove) {
             p.update && this.unSubscribeIn('update', p);
             p.ready && this.unSubscribeIn('ready', p);
+            p.detach && this.unSubscribeIn('detach', p);
             p.remove && this.unSubscribeIn('remove', p);
             p.init && this.unSubscribeIn('init', p);
         }
     };
+    /**
+     * 解除观察Subject
+     */
     CompileSubject.prototype.unLinkSubject = function () {
         this.subject && this.subject.unSubscribe(this.linkParam);
         return this;
     };
+    /**
+     * 发送初始化通知
+     * @param p 发送事件参数
+     */
     CompileSubject.prototype.init = function (p) {
         if (this.isRemove)
             return;
@@ -363,23 +395,46 @@ var CompileSubject = (function () {
             fn && fn(p);
         });
     };
+    /**
+     * 发送更新通知
+     * @param p 发送事件参数
+     */
     CompileSubject.prototype.update = function (p) {
-        if (this.isRemove)
+        if (this.isRemove || this.isDetach)
             return;
         cmpxLib_1["default"].each(this.updateList, function (fn) {
             fn && fn(p);
         });
     };
+    /**
+     * 发送分离通知，不删除
+     * @param p 发送事件参数
+     */
+    CompileSubject.prototype.detach = function (p) {
+        if (this.isRemove)
+            return;
+        this.isDetach = !this.isDetach;
+        cmpxLib_1["default"].each(this.detachList, function (fn) {
+            fn && fn(p);
+        });
+    };
+    /**
+     * 发送准备通知
+     * @param p 发送事件参数
+     */
     CompileSubject.prototype.ready = function (p) {
         if (this.isRemove)
             return;
         var list = this.readyList;
         this.readyList = [];
-        list && list.reverse();
         cmpxLib_1["default"].each(list, function (fn) {
             fn && fn(p);
         });
     };
+    /**
+     * 发送删除通知
+     * @param p 发送事件参数
+     */
     CompileSubject.prototype.remove = function (p) {
         if (this.isRemove)
             return;
@@ -443,6 +498,16 @@ var _tmplName = '__tmpl__', _getComponetTmpl = function (componet, id) {
         });
     }
     return null;
+}, _detachElement = function (nodes) {
+    if (nodes && nodes.length > 0) {
+        var //pNode:Node = _getParentElement(nodes[0]),
+        fragment_1 = document.createDocumentFragment();
+        cmpxLib_1["default"].each(nodes, function (item) {
+            fragment_1.appendChild(item);
+        });
+        return fragment_1;
+    }
+    return null;
 };
 var CompileRender = (function () {
     /**
@@ -470,15 +535,15 @@ var CompileRender = (function () {
     CompileRender.prototype.complie = function (refNode, attrs, parentComponet, subject, contextFn, subjectExclude, param) {
         var _this = this;
         var componetDef = this.componetDef;
-        subject || (subject = (parentComponet ? parentComponet.$subObject : null));
+        subject || (subject = (parentComponet ? parentComponet.$subject : null));
         subjectExclude || (subjectExclude = {});
-        //subjectExclude.remove = true;
+        subjectExclude.ready = true;
         var componet, isNewComponet = false, parentElement = _getParentElement(refNode), newSubject = new CompileSubject(subject, subjectExclude);
         if (componetDef) {
             isNewComponet = true;
             componet = new componetDef();
             componet.$name = name;
-            componet.$subObject = newSubject;
+            componet.$subject = newSubject;
             componet.$parentElement = parentElement;
             componet.$parent = parentComponet;
             parentComponet && parentComponet.$children.push(componet);
@@ -520,7 +585,7 @@ var CompileRender = (function () {
                             var childs = parentComponet.$children, idx = childs.indexOf(componet);
                             (idx >= 0) && childs.splice(idx, 1);
                         }
-                        componet.$subObject = componet.$children =
+                        componet.$subject = componet.$children =
                             componet.$parent = componet.$parentElement = null;
                     }
                 }
@@ -532,7 +597,20 @@ var CompileRender = (function () {
                 componet: componet
             });
             fragment = document.createDocumentFragment();
+            var detachFr;
             subject && subject.subscribe({
+                detach: function () {
+                    if (componet.$isDisposed)
+                        return;
+                    if (subject.isDetach)
+                        detachFr = _detachElement(childNodes);
+                    else {
+                        if (isNewComponet)
+                            newSubject.update({ componet: componet });
+                        _insertAfter(detachFr, refNode, _getParentElement(refNode));
+                        detachFr = null;
+                    }
+                },
                 remove: function (p) {
                     fragment = refNode = componet = parentElement = parentComponet = null;
                 }
@@ -546,14 +624,21 @@ var CompileRender = (function () {
             readyFn();
         }, readyFn = function () {
             _insertAfter(fragment, refNode, _getParentElement(refNode));
-            isNewComponet && componet.onReady(function () { }, null);
-            newSubject.ready({
-                componet: componet
-            });
-            //reay后再次补发update
-            newSubject.update({
-                componet: componet
-            });
+            var readyEnd = function () {
+                newSubject.ready({
+                    componet: componet
+                });
+                //reay后再次补发update
+                newSubject.update({
+                    componet: componet
+                });
+            };
+            if (isNewComponet)
+                componet.onReady(function () {
+                    readyEnd();
+                }, null);
+            else
+                readyEnd();
         };
         if (isNewComponet) {
             componet.onInit(function (err) {
@@ -673,14 +758,14 @@ var Compile = (function () {
                     else if (isWrite_1) {
                         writeFn_1(p);
                     }
-                }, pSubP_1 = isWrite_1 || isRead_1 ? parent.$subObject.subscribe({
+                }, pSubP_1 = isWrite_1 || isRead_1 ? parent.$subject.subscribe({
                     update: updateFn
                 }) : null;
                 var attrDef = htmlDef_1.HtmlDef.getHtmlAttrDef(name);
                 subject.subscribe({
                     update: updateFn,
                     remove: function () {
-                        pSubP_1 && parent.$subObject && parent.$subObject.unSubscribe(pSubP_1);
+                        pSubP_1 && parent.$subject && parent.$subject.unSubscribe(pSubP_1);
                     }
                 });
             }
@@ -773,8 +858,32 @@ var Compile = (function () {
         var value, newSubject;
         var childNodes, syncDatas, removeFn = function () {
             childNodes = _removeChildNodes(childNodes);
-        };
+        }, detachFr;
         subject.subscribe({
+            detach: function () {
+                if (syncFn) {
+                    if (subject.isDetach) {
+                        var nodes_1 = [];
+                        cmpxLib_1["default"].each(syncDatas, function (item) {
+                            nodes_1 = nodes_1.concat(item.nodes);
+                        });
+                        detachFr = _detachElement(nodes_1);
+                        nodes_1 = null;
+                    }
+                    else {
+                        detachFr && _insertAfter(detachFr, refNode, _getParentElement(refNode));
+                    }
+                }
+                else {
+                    if (subject.isDetach) {
+                        detachFr = _detachElement(childNodes);
+                    }
+                    else {
+                        detachFr && _insertAfter(detachFr, refNode, _getParentElement(refNode));
+                        detachFr = null;
+                    }
+                }
+            },
             update: function (p) {
                 var datas = dataFn.call(componet, componet, parentElement, subject);
                 if (!_equalArray(datas, value)) {
@@ -876,21 +985,21 @@ var Compile = (function () {
                         }
                         else {
                             //普通模式, 一次性全部重新生成view
-                            var fragment_1 = document.createDocumentFragment();
+                            var fragment_2 = document.createDocumentFragment();
                             removeFn();
                             newSubject && newSubject.remove({
                                 componet: componet
                             });
                             newSubject = new CompileSubject(subject);
                             cmpxLib_1["default"].each(datas, function (item, index) {
-                                eachFn.call(componet, item, count_1, index, componet, fragment_1, newSubject);
+                                eachFn.call(componet, item, count_1, index, componet, fragment_2, newSubject);
                             });
-                            childNodes = cmpxLib_1["default"].toArray(fragment_1.childNodes);
+                            childNodes = cmpxLib_1["default"].toArray(fragment_2.childNodes);
                             newSubject.update({
                                 componet: componet
                             });
-                            _insertAfter(fragment_1, refNode, _getParentElement(refNode));
-                            fragment_1 = null;
+                            _insertAfter(fragment_2, refNode, _getParentElement(refNode));
+                            fragment_2 = null;
                         }
                     }
                     else
@@ -901,7 +1010,7 @@ var Compile = (function () {
             },
             remove: function (p) {
                 removeFn();
-                newSubject = childNodes = refNode = null;
+                newSubject = childNodes = refNode = detachFr = null;
             }
         });
     };
@@ -913,65 +1022,151 @@ var Compile = (function () {
         });
     };
     ;
-    Compile.ifRender = function (ifFun, trueFn, falseFn, componet, parentElement, insertTemp, subject) {
+    Compile.ifRender = function (ifFun, trueFn, falseFn, componet, parentElement, insertTemp, subject, isX) {
         if (subject.isRemove)
             return;
-        var refNode = _getRefNode(parentElement);
-        var value, newSubject;
-        var childNodes, removeFn = function () {
-            childNodes = _removeChildNodes(childNodes);
+        var refNode = _getRefNode(parentElement), value, newSubject, childNodes, removeFn = function () {
+            isX || (childNodes = _removeChildNodes(childNodes));
         };
+        var fragment;
+        var trueFragment, trueSubject, trueNodes, falseFragment, falseSubject, falseNodes;
         subject.subscribe({
+            detach: function () {
+                if (isX) {
+                    if (subject.isDetach) {
+                        fragment = _detachElement(value ? trueNodes : falseNodes);
+                    }
+                    else {
+                        _insertAfter(fragment, refNode, _getParentElement(refNode));
+                        fragment = null;
+                    }
+                }
+                else {
+                    if (subject.isDetach) {
+                        fragment = _detachElement(childNodes);
+                    }
+                    else {
+                        _insertAfter(fragment, refNode, _getParentElement(refNode));
+                        fragment = null;
+                    }
+                }
+            },
             update: function (p) {
                 var newValue = !!ifFun.call(componet, componet, parentElement, subject);
                 if (newValue != value) {
                     value = newValue;
-                    removeFn();
-                    newSubject && newSubject.remove({
-                        componet: componet
-                    });
-                    newSubject = new CompileSubject(subject);
-                    var fragment = document.createDocumentFragment();
-                    if (newValue)
-                        trueFn.call(componet, componet, fragment, newSubject);
-                    else
-                        falseFn.call(componet, componet, fragment, newSubject);
-                    childNodes = cmpxLib_1["default"].toArray(fragment.childNodes);
-                    newSubject.update({
-                        componet: componet
-                    });
-                    _insertAfter(fragment, refNode, _getParentElement(refNode));
-                    fragment = null;
+                    if (isX) {
+                        if (newValue) {
+                            falseNodes && (falseFragment = _detachElement(falseNodes));
+                            falseSubject && falseSubject.detach({
+                                componet: componet
+                            });
+                            if (trueFragment) {
+                                fragment = trueFragment;
+                                trueSubject.detach({
+                                    componet: componet
+                                });
+                            }
+                            else {
+                                trueSubject = new CompileSubject(subject);
+                                fragment = document.createDocumentFragment();
+                                trueFn.call(componet, componet, fragment, trueSubject);
+                                trueNodes = cmpxLib_1["default"].toArray(fragment.childNodes);
+                            }
+                            newSubject = trueSubject;
+                        }
+                        else {
+                            trueNodes && (trueFragment = _detachElement(trueNodes));
+                            trueSubject && trueSubject.detach({
+                                componet: componet
+                            });
+                            if (falseFragment) {
+                                fragment = falseFragment;
+                                falseSubject.detach({
+                                    componet: componet
+                                });
+                            }
+                            else {
+                                falseSubject = new CompileSubject(subject);
+                                fragment = document.createDocumentFragment();
+                                falseFn.call(componet, componet, fragment, falseSubject);
+                                falseNodes = cmpxLib_1["default"].toArray(fragment.childNodes);
+                            }
+                            newSubject = falseSubject;
+                        }
+                        newSubject.update({
+                            componet: componet
+                        });
+                        _insertAfter(fragment, refNode, _getParentElement(refNode));
+                        fragment = null;
+                    }
+                    else {
+                        removeFn();
+                        newSubject && newSubject.remove({
+                            componet: componet
+                        });
+                        newSubject = new CompileSubject(subject);
+                        fragment = document.createDocumentFragment();
+                        if (newValue)
+                            trueFn.call(componet, componet, fragment, newSubject);
+                        else
+                            falseFn.call(componet, componet, fragment, newSubject);
+                        childNodes = cmpxLib_1["default"].toArray(fragment.childNodes);
+                        newSubject.update({
+                            componet: componet
+                        });
+                        _insertAfter(fragment, refNode, _getParentElement(refNode));
+                        fragment = null;
+                    }
                 }
             },
             remove: function (p) {
                 removeFn();
-                newSubject = childNodes = refNode = null;
+                newSubject = childNodes = refNode
+                    = falseNodes = trueNodes = falseSubject = trueSubject = null;
             }
         });
     };
     Compile.tmplRender = function (id, componet, parentElement, subject, contextFn) {
         if (subject.isRemove)
             return;
-        var tmpls = componet[_tmplName];
+        var tmpls = componet[_tmplName], $componet = componet;
         tmpls || (tmpls = componet[_tmplName] = {});
         tmpls[id] = function (componet, element, subject, param) {
-            contextFn && contextFn.call(componet, componet, element, subject, param);
+            if ($componet != componet) {
+                //如果tmpl在不同的component, 将this为当前域，夸域处理
+                subject = new CompileSubject(subject);
+                var pSubject_1 = $componet.$subject, subsP_1 = pSubject_1.subscribe({
+                    update: function (p) {
+                        subject.update(p);
+                    }
+                });
+                subject.subscribe({
+                    remove: function () {
+                        subsP_1 && pSubject_1.unSubscribe(subsP_1);
+                    }
+                });
+            }
+            contextFn && contextFn.call($componet, $componet, element, subject, param);
         };
     };
-    Compile.includeRender = function (context, componet, parentElement, insertTemp, subject, param) {
+    Compile.includeRender = function (context, contextFn, componet, parentElement, insertTemp, subject, param) {
         if (!context || subject.isRemove)
             return;
         if (cmpxLib_1["default"].isString(context)) {
             var tmpl = _getComponetTmpl(componet, context);
             if (tmpl) {
-                var pTmep_1 = param.call(componet) || {};
-                subject.subscribe({
+                var pTmep_1 = (param && param.call(componet)) || {};
+                param && subject.subscribe({
                     update: function () {
                         cmpxLib_1["default"].extend(pTmep_1, param.call(componet));
                     }
                 });
-                tmpl.call(componet, componet, parentElement, subject, pTmep_1);
+                if (tmpl)
+                    tmpl(componet, parentElement, subject, pTmep_1);
+                else if (contextFn) {
+                    contextFn.call(componet, componet, parentElement, subject, pTmep_1);
+                }
             }
         }
         else {
@@ -1015,7 +1210,7 @@ var _buildCompileFn = function (tagInfos) {
     var outList = [], varNameList = [];
     _buildCompileFnContent(tagInfos, outList, varNameList, true);
     varNameList.length > 0 && outList.unshift('var ' + varNameList.join(',') + ';');
-    outList.unshift("var __tmplRender = Compile.tmplRender,\n        __setAttributeEx = Compile.setAttributeEx, __createElementEx = Compile.createElementEx,\n        __createTextNode = Compile.createTextNode, __setViewvar = Compile.setViewvar,\n        __forRender = Compile.forRender, __ifRender = Compile.ifRender,\n        __includeRender = Compile.includeRender, __updateRender = Compile.updateRender;");
+    outList.unshift("var __tmplRender = Compile.tmplRender,\n        __setAttributeEx = Compile.setAttributeEx, __createElementEx = Compile.createElementEx,\n        __createTextNode = Compile.createTextNode, __setViewvar = Compile.setViewvar,\n        __forRender = Compile.forRender, __ifRender = Compile.ifRender,\n        __includeRender = Compile.includeRender, __updateRender = Compile.updateRender,\n        __componet = componet;");
     return new Function('CmpxLib', 'Compile', 'componet', 'element', 'subject', 'param', outList.join('\n'));
 }, _buildCpFnRetRmRegex = /\s*\=\s*\[\s*\]\s*$/, _escapeStringRegex = /([\"\\])/gm, _escapeBuildString = function (s) {
     return s ? s.replace(/([\"\\])/gm, '\\$1').replace(/\n/gm, '\\n').replace(/\r/gm, '\\r') : '';
@@ -1131,7 +1326,8 @@ var _buildCompileFn = function (tagInfos) {
         else {
             switch (tagName) {
                 case 'for':
-                    var extend = tag.attrs[0].extend, itemName = extend.item, fSync = extend.sync;
+                case 'forx':
+                    var isForX = (tagName == 'forx'), extend = tag.attrs[0].extend, itemName = extend.item, fSync = extend.sync;
                     outList.push('__forRender(function (componet, element, subject) {');
                     outList.push('return ' + extend.datas + ';');
                     outList.push('}, function (' + itemName + ', $count, $index, componet, element, subject) {');
@@ -1143,8 +1339,7 @@ var _buildCompileFn = function (tagInfos) {
                         _buildCompileFnContent(tag.children, outList, varNameList, preInsert);
                     outList.push('return setForVar;');
                     var fSyFn = 'null';
-                    if (extend.sync) {
-                        arguments;
+                    if (isForX || extend.sync) {
                         var syncCT = extend.syncCT;
                         //function(item, count, index, newList)=>返回index表示已存在的位置，-1表示不存在;
                         fSyFn = syncCT ? 'function(){ var fn = ' + syncCT + '; return fn ? fn.apply(this, arguments) : -1; }'
@@ -1154,7 +1349,8 @@ var _buildCompileFn = function (tagInfos) {
                     preInsert = true;
                     break;
                 case 'if':
-                    var ifFn_1 = function (ifTag) {
+                case 'ifx':
+                    var isX_1 = (tagName == 'ifx'), ifFn_1 = function (ifTag) {
                         var ifChild = ifTag.children, hasElse = ifChild ? ifChild[ifChild.length - 1].tagName == 'else' : false, elseTag = hasElse ? ifChild.pop() : null;
                         outList.push('__ifRender(function (componet, element, subject) {');
                         outList.push('return ' + (ifTag.content || 'true'));
@@ -1165,21 +1361,28 @@ var _buildCompileFn = function (tagInfos) {
                             ifFn_1(elseTag);
                             //_buildCompileFnContent(elseTag.children, outList, varNameList, preInsert);
                         }
-                        outList.push('}, componet, element, ' + _getInsertTemp(preInsert) + ', subject);');
+                        outList.push('}, componet, element, ' + _getInsertTemp(preInsert) + ', subject, ' + (isX_1 ? 'true' : 'false') + ');');
                     };
                     ifFn_1(tag);
                     preInsert = true;
                     break;
                 case 'include':
-                    var incAttr = cmpxLib_1["default"].arrayToObject(tag.attrs, 'name'), incTmpl = incAttr['tmpl'], incParam = incAttr['param'] ? incAttr['param'].value : 'null', incRender = incAttr['render'];
+                    var incAttr = cmpxLib_1["default"].arrayToObject(tag.attrs, 'name'), incTmpl = incAttr['tmpl'], incParam = incAttr['param'] ? incAttr['param'].value : 'null', incRender = incAttr['render'], hasIncChild = tag.children && tag.children.length > 0;
+                    incParam = incParam == 'null' ? incParam : ('function(){ return ' + incParam + ';}');
                     incRender && (incRender = 'function(){ return ' + incRender.value + '}');
                     var context_1 = incRender ? incRender : ('"' + (incTmpl ? _escapeBuildString(incTmpl.value) : '') + '"');
-                    outList.push('__includeRender(' + context_1 + ', componet, element, ' + _getInsertTemp(preInsert) + ', subject, function(){ return ' + incParam + ';});');
+                    if (hasIncChild) {
+                        outList.push('__includeRender(' + context_1 + ', function (componet, element, subject) {');
+                        _buildCompileFnContent(tag.children, outList, varNameList, preInsert);
+                        outList.push('}, componet, element, ' + _getInsertTemp(preInsert) + ', subject,  ' + incParam + ');');
+                    }
+                    else
+                        outList.push('__includeRender(' + context_1 + ', null, componet, element, ' + _getInsertTemp(preInsert) + ', subject,  ' + incParam + ');');
                     preInsert = true;
                     break;
                 case 'tmpl':
                     var tmplAttr = cmpxLib_1["default"].arrayToObject(tag.attrs, 'name'), tmplId = tmplAttr['id'], tmplLet = tmplAttr['let'];
-                    outList.push('__tmplRender("' + (tmplId ? _escapeBuildString(tmplId.value) : '') + '", componet, element, subject, function (componet, element, subject, param) {');
+                    outList.push('__tmplRender("' + (tmplId ? _escapeBuildString(tmplId.value) : '') + '", __componet, element, subject, function (componet, element, subject, param) {');
                     tmplLet && outList.push('var ' + tmplLet.value + ';');
                     tmplLet && outList.push('__updateRender(function(){' + tmplLet.value + '}, componet, element, subject);');
                     _buildCompileFnContent(tag.children, outList, varNameList, preInsert);

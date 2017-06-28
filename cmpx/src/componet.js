@@ -20,12 +20,12 @@ var Componet = (function () {
         this.onUpdateBefore(function () {
             if (_this.$isDisposed)
                 return;
-            _this.$subObject.update({
+            _this.$subject.update({
                 componet: _this,
                 param: p
             });
+            _this.onUpdate(function () { }, p);
         }, p);
-        this.onUpdate(function () { }, p);
     };
     /**
      * 步异步更新View，View与Componet数据同步
