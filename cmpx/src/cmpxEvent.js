@@ -18,7 +18,7 @@ var CmpxEvent = (function () {
      */
     CmpxEvent.prototype.off = function (fn) {
         if (fn) {
-            var index = cmpxLib_1["default"].inArray(this.events, fn);
+            var index = cmpxLib_1.CmpxLib.inArray(this.events, fn);
             index >= 0 && this.events.splice(index, 1);
         }
         else
@@ -31,7 +31,7 @@ var CmpxEvent = (function () {
      */
     CmpxEvent.prototype.trigger = function (args, thisArg) {
         var ret;
-        cmpxLib_1["default"].each(this.events, function (item) {
+        cmpxLib_1.CmpxLib.each(this.events, function (item) {
             ret = item && item.apply(thisArg, args);
             return ret;
         });

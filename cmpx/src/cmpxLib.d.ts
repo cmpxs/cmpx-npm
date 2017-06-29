@@ -1,4 +1,4 @@
-export default class CmpxLib {
+export declare class CmpxLib {
     static stringEmpty: string;
     static noop: () => void;
     static hasOwnProp(obj: any, prop: string): any;

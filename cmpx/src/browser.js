@@ -15,7 +15,7 @@ var compile_1 = require("./compile");
 var htmlDef_1 = require("./htmlDef");
 var cmpxLib_1 = require("./cmpxLib");
 var _getParentElement = htmlDef_1.HtmlDef.getParentElement, _setAttribute = function (element, attrs) {
-    cmpxLib_1["default"].each(attrs, function (item) {
+    cmpxLib_1.CmpxLib.each(attrs, function (item) {
         htmlDef_1.HtmlDef.getHtmlAttrDef(item.name).setAttribute(element, item.name, item.value, item.subName);
     });
 }, _htmlTtype = /script|style/i, _createElementRaw = function (name, attrs, parent, content) {
@@ -58,7 +58,7 @@ var _htmlConfig = function () {
                 if (modelChecked.test(element['type']))
                     element['checked'] = element['value'] == value;
                 else
-                    element['value'] = cmpxLib_1["default"].toStr(value);
+                    element['value'] = cmpxLib_1.CmpxLib.toStr(value);
             },
             getAttribute: function (element, name, subName) {
                 return !modelChecked.test(element['type']) || element['checked'] ? element['value'] : '';
@@ -142,6 +142,6 @@ var Browser = (function (_super) {
         return this;
     };
     return Browser;
-}(platform_1["default"]));
+}(platform_1.Platform));
 exports.Browser = Browser;
 //# sourceMappingURL=browser.js.map

@@ -156,5 +156,5 @@ var CmpxLib = (function () {
 }());
 CmpxLib.stringEmpty = stringEmpty;
 CmpxLib.noop = noop;
-exports["default"] = CmpxLib;
+exports.CmpxLib = CmpxLib;
 //# sourceMappingURL=cmpxLib.js.map

@@ -5,5 +5,5 @@ var Platform = (function () {
     }
     return Platform;
 }());
-exports["default"] = Platform;
+exports.Platform = Platform;
 //# sourceMappingURL=platform.js.map

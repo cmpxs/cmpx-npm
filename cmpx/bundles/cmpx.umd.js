@@ -339,7 +339,7 @@ var DEFAULT_EVENT_DEF = {
         //attachEvent
     },
     removeEventListener: function (element, eventName, context, useCapture) {
-        element.addEventListener(eventName, context, useCapture);
+        element.removeEventListener(eventName, context, useCapture);
         //detachEvent
     }
 };
@@ -2083,6 +2083,7 @@ var Browser = (function (_super) {
     return Browser;
 }(Platform));
 
+exports.CmpxLib = CmpxLib;
 exports.CmpxEvent = CmpxEvent;
 exports.DEFAULT_CREATEELEMENT = DEFAULT_CREATEELEMENT;
 exports.HtmlTagDef = HtmlTagDef;
@@ -2098,6 +2099,7 @@ exports.CompileSubject = CompileSubject;
 exports.CompileRender = CompileRender;
 exports.Compile = Compile;
 exports.Componet = Componet;
+exports.Platform = Platform;
 exports.Browser = Browser;
 
 Object.defineProperty(exports, '__esModule', { value: true });

@@ -10,7 +10,7 @@ var cmpxLib_1 = require("./cmpxLib");
  */
 function DEFAULT_CREATEELEMENT(name, attrs, parent, content) {
     var element = document.createElement(name);
-    cmpxLib_1["default"].each(attrs, function (item) {
+    cmpxLib_1.CmpxLib.each(attrs, function (item) {
         HtmlDef.getHtmlAttrDef(item.name).setAttribute(element, item.name, item.value, item.subName);
     });
     return element;
@@ -18,7 +18,7 @@ function DEFAULT_CREATEELEMENT(name, attrs, parent, content) {
 exports.DEFAULT_CREATEELEMENT = DEFAULT_CREATEELEMENT;
 //注释标签
 var _noteTagRegex = /\<\!--(?:.|\n|\r)*?--\>/gim, _extend = function (obj, p) {
-    p && cmpxLib_1["default"].eachProp(p, function (item, name) { obj[name.toLowerCase()] = item; });
+    p && cmpxLib_1.CmpxLib.eachProp(p, function (item, name) { obj[name.toLowerCase()] = item; });
 };
 /**
  * HtmlTag定义类
@@ -91,7 +91,7 @@ exports.DEFAULT_ATTR = {
         if (subName)
             element[name][subName] = value;
         else
-            element.setAttribute(name, cmpxLib_1["default"].toStr(value));
+            element.setAttribute(name, cmpxLib_1.CmpxLib.toStr(value));
     },
     getAttribute: function (element, name, subName) {
         if (subName)
@@ -106,9 +106,9 @@ exports.DEFAULT_ATTR = {
 exports.DEFAULT_ATTR_PROP = {
     setAttribute: function (element, name, value, subName) {
         if (subName)
-            element[name][subName] = name == 'value' ? cmpxLib_1["default"].toStr(value) : value;
+            element[name][subName] = name == 'value' ? cmpxLib_1.CmpxLib.toStr(value) : value;
         else
-            element[name] = name == 'value' ? cmpxLib_1["default"].toStr(value) : value;
+            element[name] = name == 'value' ? cmpxLib_1.CmpxLib.toStr(value) : value;
     },
     getAttribute: function (element, name, subName) {
         if (subName)
@@ -134,7 +134,7 @@ exports.DEFAULT_EVENT_DEF = {
         //attachEvent
     },
     removeEventListener: function (element, eventName, context, useCapture) {
-        element.addEventListener(eventName, context, useCapture);
+        element.removeEventListener(eventName, context, useCapture);
         //detachEvent
     }
 };
@@ -200,7 +200,7 @@ var HtmlDef = (function () {
     HtmlDef.handleTagContent = function (html) {
         return _removeSpace(html.replace(_noteTagRegex, ''))
             .replace(_rawContentRegex, function (find, name, attrs, content) {
-            return ['<', name, attrs || '', '>', cmpxLib_1["default"].encodeHtml(content || ''), '</', name, '>'].join('');
+            return ['<', name, attrs || '', '>', cmpxLib_1.CmpxLib.encodeHtml(content || ''), '</', name, '>'].join('');
         });
     };
     return HtmlDef;
@@ -208,7 +208,7 @@ var HtmlDef = (function () {
 exports.HtmlDef = HtmlDef;
 function _makeSpecTags() {
     var rawTags = [];
-    cmpxLib_1["default"].eachProp(_htmlTagDefConfig, function (item, name) {
+    cmpxLib_1.CmpxLib.eachProp(_htmlTagDefConfig, function (item, name) {
         item.raw && rawTags.push(name);
     });
     var rawNames = rawTags.join('|');

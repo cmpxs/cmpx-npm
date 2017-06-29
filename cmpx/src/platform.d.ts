@@ -1,3 +1,3 @@
-export default abstract class Platform {
+export declare abstract class Platform {
     abstract boot(component: any): Platform;
 }
