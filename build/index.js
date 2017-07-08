@@ -6,12 +6,12 @@ var path = require('path'),
 var cmpx = require('cmpx'),
   CompileRender = cmpx.CompileRender;
 
-var _tmplRegex = /\s*@VM\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmpl\s*\:\s*(([`])[^`]*?\2)/gmi,
-  _tmplRegex2 = /\s*@VM\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmpl\s*\:\s*((["']).*\2)/gmi,
+var _tmplRegex = /\s*@VMComponet\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmpl\s*\:\s*(([`])[^`]*?\2)/gmi,
+  _tmplRegex2 = /\s*@VMComponet\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmpl\s*\:\s*((["']).*\2)/gmi,
   _renderRegex = /\s*\$render\s*\(\s*(([`])[^`]*?\2)/gmi,
   _renderRegex2 = /\s*\$render\s*\(\s*((["']).*\2)/gmi,
-  _tmplUrlRegex = /\s*@VM\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmplUrl\s*\:\s*((["']).*\2)/gmi,
-  _styleUrlRegex = /\s*@VM\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?styleUrl\s*\:\s*((["']).*\2)/gmi;
+  _tmplUrlRegex = /\s*@VMComponet\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmplUrl\s*\:\s*((["']).*\2)/gmi,
+  _styleUrlRegex = /\s*@VMComponet\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?styleUrl\s*\:\s*((["']).*\2)/gmi;
 
 var _buildRegex = /##%(tmpl|tmplUrl|styleUrl|\$render)%\$\-\[([^\]]*?)\]/gmi;
 
