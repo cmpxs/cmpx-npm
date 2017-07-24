@@ -1,7 +1,7 @@
 {
-  "name": "cmpx-build",
-  "version": "1.0.0-deta5",
-  "description": "cmpx-build",
+  "name": "cmpx-mvc",
+  "version": "1.0.0-deta2",
+  "description": "cmpx-mvc",
   "main": "index.js",
   "scripts": {
     "test": "npm test"
@@ -11,7 +11,7 @@
     "url": "git+https://github.com/cmpxs/cmpx-npm.git"
   },
   "keywords": [
-    "cmpx-build"
+    "cmpx-mvc"
   ],
   "author": "cmpxs",
   "license": "MIT",
