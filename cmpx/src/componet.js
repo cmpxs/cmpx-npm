@@ -1,6 +1,5 @@
 "use strict";
 exports.__esModule = true;
-var compile_1 = require("./compile");
 var Componet = (function () {
     function Componet() {
         this.$children = [];
@@ -17,6 +16,7 @@ var Componet = (function () {
         var _this = this;
         if (this.$isDisposed)
             return;
+        this.clearUpdateTime();
         this.onUpdateBefore(function () {
             if (_this.$isDisposed)
                 return;
@@ -27,13 +27,19 @@ var Componet = (function () {
             _this.onUpdate(function () { }, p);
         }, p);
     };
+    Componet.prototype.clearUpdateTime = function () {
+        if (this.updateId) {
+            clearTimeout(this.updateId);
+            this.updateId = null;
+        }
+    };
     /**
      * 步异步更新View，View与Componet数据同步
      * @param p 传入参数
      */
     Componet.prototype.$updateAsync = function (callback, p) {
         var _this = this;
-        this.updateId && clearTimeout(this.updateId);
+        this.clearUpdateTime();
         this.updateId = setTimeout(function () {
             _this.updateId = null;
             _this.$update(p);
@@ -43,12 +49,11 @@ var Componet = (function () {
     /**
      * 将模板生成CompileRender, 用于include标签动态绑定用
      * 注意动态模板里不要模板变量(viewvar)，请参数p传入，原因编译压缩后模板变量会改变
-     * @param tmpl 模板文本
-     * @param p 传入模板参数
+     * @param context 模板文本
      */
-    Componet.prototype.$render = function (tmpl) {
-        var rd = new compile_1.CompileRender(tmpl);
-        return rd;
+    Componet.prototype.$render = function (context) {
+        //var rd = new CompileRender(context);
+        return context;
     };
     /**
      * 在解释View之前触发，一般准备数据用

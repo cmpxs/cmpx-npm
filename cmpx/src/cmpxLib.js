@@ -146,15 +146,36 @@ var CmpxLib = (function () {
             }
         }
     };
-    CmpxLib.extend = function (obj, p) {
-        if (obj && p) {
-            CmpxLib.eachProp(p, function (item, name) { obj[name] = item; });
+    CmpxLib.extend = function (obj) {
+        var args = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            args[_i - 1] = arguments[_i];
+        }
+        if (obj) {
+            CmpxLib.each(args, function (p) {
+                p && CmpxLib.eachProp(p, function (item, name) { obj[name] = item; });
+            });
         }
         return obj;
     };
+    CmpxLib.makeAutoId = function () {
+        var t = new Date().valueOf();
+        if ((++_tick) > 100000)
+            _tick = 0;
+        return [t, _tick].join('_');
+    };
+    /**
+     * 是否类
+     * @param p 参数
+     * @param cls 类
+     */
+    CmpxLib.isClass = function (p, cls) {
+        return p ? (p == cls || (p.prototype && p.prototype instanceof cls)) : false;
+    };
+    CmpxLib.stringEmpty = stringEmpty;
+    CmpxLib.noop = noop;
     return CmpxLib;
 }());
-CmpxLib.stringEmpty = stringEmpty;
-CmpxLib.noop = noop;
 exports.CmpxLib = CmpxLib;
+var _tick = 0;
 //# sourceMappingURL=cmpxLib.js.map

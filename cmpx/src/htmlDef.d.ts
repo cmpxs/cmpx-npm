@@ -1,3 +1,7 @@
+export interface IComplieInfo {
+    subject: any;
+    componet: any;
+}
 /**
  * HtmlTag配置
  */
@@ -28,7 +32,7 @@ export interface ICreateElementAttr {
  * @param parent 父element
  * @param content 内容, contentType为RAW_TEXT或RAW_TEXT时会传入
  */
-export declare function DEFAULT_CREATEELEMENT(name: string, attrs: ICreateElementAttr[], parent?: HTMLElement, content?: string): HTMLElement;
+export declare function DEFAULT_CREATEELEMENT(name: string, attrs: ICreateElementAttr[], parent?: HTMLElement, content?: string, complieInfo?: IComplieInfo): HTMLElement;
 /**
  * HtmlTag定义类
  */
@@ -41,11 +45,11 @@ export declare class HtmlTagDef {
     /**
      * element创建器
      */
-    createElement: (name: string, attrs: ICreateElementAttr[], parent?: HTMLElement, content?: string) => HTMLElement;
+    createElement: (name: string, attrs: ICreateElementAttr[], parent?: HTMLElement, content?: string, complieInfo?: IComplieInfo) => HTMLElement;
     constructor({single, raw, createElement}?: {
         single?: boolean;
         raw?: boolean;
-        createElement?: (name: string, attrs: ICreateElementAttr[], parent?: HTMLElement, content?: string) => HTMLElement;
+        createElement?: (name: string, attrs: ICreateElementAttr[], parent?: HTMLElement, content?: string, complieInfo?: IComplieInfo) => HTMLElement;
     });
 }
 export declare const SINGLE_TAG: HtmlTagDef, DEFULE_TAG: HtmlTagDef;
@@ -53,8 +57,9 @@ export declare const SINGLE_TAG: HtmlTagDef, DEFULE_TAG: HtmlTagDef;
  * HtmlAttr定义
  */
 export interface IHtmlAttrDef {
-    setAttribute: (element: HTMLElement, name: string, value: string, subName?: string) => void;
-    getAttribute: (element: HTMLElement, name: string, subName?: string) => any;
+    initAttribute?: (element: HTMLElement, name: string, value: string, subName?: string, complieInfo?: IComplieInfo) => void;
+    setAttribute: (element: HTMLElement, name: string, value: string, subName?: string, complieInfo?: IComplieInfo) => void;
+    getAttribute: (element: HTMLElement, name: string, subName?: string, complieInfo?: IComplieInfo) => any;
     writeEvent?: string[];
 }
 /**
@@ -72,8 +77,8 @@ export interface IHtmlAttrDefConfig {
     [name: string]: IHtmlAttrDef;
 }
 export interface IHtmlEventDef {
-    addEventListener: (element: HTMLElement, eventName: string, context: (event: any) => any, useCapture: boolean) => void;
-    removeEventListener: (element: HTMLElement, eventName: string, context: (event: any) => any, useCapture: boolean) => void;
+    addEventListener: (element: HTMLElement, eventName: string, context: (event: any) => any, useCapture: boolean, complieInfo?: IComplieInfo) => void;
+    removeEventListener: (element: HTMLElement, eventName: string, context: (event: any) => any, useCapture: boolean, complieInfo?: IComplieInfo) => void;
 }
 /**
  * 默认事件定义
@@ -97,6 +102,11 @@ export declare class HtmlDef {
      * @param p 标签配置
      */
     static extendHtmlTagDef(p: IHtmlTagDefConfig): void;
+    /**
+     * 是否有属性定义
+     * @param name
+     */
+    static hasHtmlAttrDef(name: string): boolean;
     /**
      * 获取属性定义
      * @param name

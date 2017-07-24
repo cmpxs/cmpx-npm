@@ -2,8 +2,140 @@
 exports.__esModule = true;
 var cmpxLib_1 = require("./cmpxLib");
 var htmlDef_1 = require("./htmlDef");
+var componet_1 = require("./componet");
 var cmpxEvent_1 = require("./cmpxEvent");
+var compileSubject_1 = require("./compileSubject");
 var _undef;
+var _getBindDef = function (target, name) {
+    var context = VMManager.getBind(target, name);
+    return context ? context.def : null;
+};
+/**
+ * 注入组件配置信息
+ * @param config
+ */
+function VMBind(config) {
+    return function (constructor) {
+        var target = constructor.prototype, context = {
+            name: config.name,
+            type: 'Bind',
+            def: constructor
+        };
+        VMManager.setConfig(target, config);
+        VMManager.include(target, context, null);
+    };
+}
+exports.VMBind = VMBind;
+var _attrEventName = 'events', _getBindEvents = function (bind) {
+    return VMManager.getVM(bind, _attrEventName);
+};
+/**
+ * 引用模板事件
+ * @param name 变量名称，未指定为属性名称
+ */
+function VMEvent(name) {
+    return function (bind, propKey) {
+        name || (name = propKey);
+        var events = VMManager.getVM(bind, _attrEventName, []);
+        events.push({
+            name: name,
+            fn: bind[propKey]
+        });
+    };
+}
+exports.VMEvent = VMEvent;
+var _vmAttrName = 'attrs', _getVmAttrs = function (target) {
+    return VMManager.getVM(target, _vmAttrName);
+};
+/**
+ * 引用模板变量attr
+ * @param name 变量名称，未指定为属性名称
+ */
+function VMAttr(name) {
+    return function (target, propKey) {
+        name || (name = propKey);
+        var names = VMManager.getVM(target, _vmAttrName, {});
+        names[name] = propKey;
+    };
+}
+exports.VMAttr = VMAttr;
+var _vmWatchName = 'watchs', _getWatch = function (target) {
+    return VMManager.getVM(target, _vmWatchName);
+}, _getWatchContext = function (target) {
+    var watchs = _getWatch(target);
+    if (!watchs)
+        return null;
+    var values = {}, getVal = function (name) {
+        return values[name] || (values[name] = []);
+    };
+    return function () {
+        var val, newVal, fn, isC, res, valList;
+        cmpxLib_1.CmpxLib.each(watchs, function (item) {
+            valList = getVal(item.name);
+            fn = item.fn;
+            isC = false;
+            res = [];
+            cmpxLib_1.CmpxLib.each(item.watchs, function (item, idx) {
+                val = valList[idx];
+                if (cmpxLib_1.CmpxLib.isArray(item)) {
+                    var newValList_1 = [];
+                    val || (val = []);
+                    isC = true;
+                    cmpxLib_1.CmpxLib.each(item, function (item, idx) {
+                        newVal = item.call(target);
+                        if (_equals(val[idx], newVal)) {
+                            isC = false;
+                        }
+                        newValList_1.push(newVal);
+                    });
+                    res.push(newValList_1);
+                }
+                else {
+                    newVal = item.call(target);
+                    if (!_equals(val, newVal)) {
+                        isC = true;
+                        //valList[idx] = newVal;
+                    }
+                    res.push(newVal);
+                }
+            });
+            if (isC) {
+                values[item.name] = res;
+                fn.apply(target, res);
+            }
+        });
+    };
+};
+/**
+ * 引用模板变量watch
+ * @param p
+ */
+function VMWatch() {
+    var args = [];
+    for (var _i = 0; _i < arguments.length; _i++) {
+        args[_i] = arguments[_i];
+    }
+    return function (target, propKey) {
+        var watchs = VMManager.getVM(target, _vmWatchName, []), fn = target[propKey], res = [];
+        cmpxLib_1.CmpxLib.each(args, function (item) {
+            if (cmpxLib_1.CmpxLib.isArray(item)) {
+                var tL_1 = [];
+                cmpxLib_1.CmpxLib.each(item, function (item) {
+                    tL_1.push(cmpxLib_1.CmpxLib.isString(item) ? new Function(['return ', item].join('')) : item);
+                });
+                res.push(tL_1);
+            }
+            else
+                res.push(cmpxLib_1.CmpxLib.isString(item) ? new Function(['return ', item].join('')) : item);
+        });
+        watchs.push({
+            name: propKey,
+            watchs: res,
+            fn: fn
+        });
+    };
+}
+exports.VMWatch = VMWatch;
 //新建一个text节点
 var _newTextContent = function (tmpl, start, end) {
     var text = tmpl.substring(start, end), bind = _cmdDecodeAttrRegex.test(text), bindInfo = bind ? _getBind(text, '"') : null;
@@ -78,8 +210,7 @@ _tagInfoRegex = /\<\s*(\/*)\s*([^<>\s]+)\s*([^<>]*?)(\/*)\s*\>|\{\{\s*(\/*)\s*([
                 end: end,
                 single: single,
                 index: index,
-                htmlTagDef: htmlTagDef //,
-                //componet: cmd ? false : !!_registerVM[tagName]
+                htmlTagDef: htmlTagDef
             };
             list.push(item);
         }
@@ -145,18 +276,18 @@ _getBind = function (value, split) {
             }
             readTxt = '';
             switch (type) {
-                case ':':
+                case ':'://一次只读
                     onceList.push(txt);
                     isOnce = true;
                     readTxt = onlyBing ? 'once0' : [split, 'once' + (onceList.length - 1), split].join('+');
                     break;
-                case '@':
+                case '@'://事件
                     event = txt;
                     break;
-                case '>':
+                case '>'://只写
                     write = txt;
                     break;
-                case '#':
+                case '#'://读写
                     write = txt;
                 case '<': //只读
                 default:
@@ -213,63 +344,164 @@ _getBind = function (value, split) {
     }
     return index;
 };
-var _registerVM = {}, _vmName = '__vm__', _getVmConfig = function (componetDef) {
-    return componetDef.prototype[_vmName];
-}, _getVmByComponetDef = function (componetDef) {
-    var config = _getVmConfig(componetDef);
-    return config ? _registerVM[config.name] : null;
-}, _readyRd = false, _renderPR = [];
+var _vmName = "__vm__", _vmConfigName = 'config', _vmContextName = 'context', _vmOtherName = 'other';
+var VMManager = (function () {
+    function VMManager() {
+    }
+    /**
+     * VM 内容
+     * @param target
+     * @param name
+     * @param context
+     */
+    VMManager.setVM = function (target, name, context) {
+        var vm = target[_vmName] || (target[_vmName] = {});
+        return vm[name] = context;
+    };
+    /**
+     * 获取MV内容
+     * @param target
+     * @param name
+     * @param defaultP 如果不存在时，此为默认内容
+     */
+    VMManager.getVM = function (target, name, defaultP) {
+        var vm = target[_vmName], re = vm && vm[name];
+        if (!re && defaultP) {
+            re = this.setVM(target, name, defaultP);
+        }
+        return re;
+    };
+    VMManager.include = function (target, context, include, parent) {
+        var obj = {
+            parent: null,
+            context: context,
+            componets: {},
+            binds: {}
+        }, temp;
+        var a;
+        cmpxLib_1.CmpxLib.each(include, function (item) {
+            temp = this.getContext(item.prototype);
+            if (temp) {
+                switch (temp.type) {
+                    case 'Componet':
+                        obj.componets[temp.name] = temp;
+                        break;
+                    case 'Bind':
+                        obj.binds[temp.name] = temp;
+                        break;
+                }
+            }
+        }, this);
+        return this.setVM(target, _vmContextName, obj);
+    };
+    VMManager.getContext = function (target) {
+        var obj = this.getVM(target, _vmContextName);
+        return obj && obj.context;
+    };
+    VMManager.getContextEx = function (target, type, name) {
+        var obj = this.getVM(target, _vmContextName);
+        var items = obj && obj[type], cp = items && items[name], parent;
+        if (!cp && this.parent && obj.context) {
+            parent = this.parent(target, obj.context);
+        }
+        return cp || (parent && this.getContextEx(parent, type, name));
+    };
+    VMManager.getComponet = function (target, name) {
+        return name ? this.getContextEx(target, 'componets', name)
+            : this.getContext(target);
+    };
+    VMManager.getBind = function (target, name) {
+        return name ? this.getContextEx(target, 'binds', name)
+            : this.getContext(target);
+    };
+    /**
+     * 配置
+     * @param target
+     * @param config
+     */
+    VMManager.setConfig = function (target, config) {
+        return this.setVM(target, _vmConfigName, config);
+    };
+    VMManager.getConfig = function (target) {
+        return this.getVM(target, _vmConfigName);
+    };
+    // private static getContext(target:any): any{
+    //     return this.getVM(target, _vmContextName);
+    // }
+    // /**
+    //  * 其它
+    //  * @param target 
+    //  * @param name 
+    //  * @param context 
+    //  */
+    // static setOther(target:any, name:string, context:any){
+    //     return this.setVM(target, _vmOtherName, context);
+    // }
+    // static getOter(target:any, name:string): any{
+    //     return this.getVM(target, _vmOtherName);
+    // }
+    VMManager.getTarget = function (p, t) {
+        return (p instanceof t ? p : p.prototype);
+    };
+    return VMManager;
+}());
+exports.VMManager = VMManager;
+var _readyRd = false, _renderPR = [];
 /**
  * 注入组件配置信息
  * @param config
  */
-function VM(vm) {
+function VMComponet(config) {
     return function (constructor) {
-        _registerVM[vm.name] = {
+        var name = config.name, target = constructor.prototype, context = {
+            name: name,
+            type: 'Componet',
             render: null,
-            vm: vm,
+            vm: config,
             componetDef: constructor
         };
+        target.$name = config.name;
+        VMManager.setConfig(target, config);
+        //target[_vmName] = config;
+        //VMManager.setContext(target, context);
+        VMManager.include(target, context, config.include);
         var rdF = function () {
-            //_registerVM[vm.name].render = new CompileRender(vm.tmpl, constructor);
             var head = document.head;
-            if (vm.styleUrl && !cmpxLib_1.CmpxLib.isString(vm.styleUrl)) {
-                vm.style = vm.styleUrl();
-                vm.styleUrl = null;
+            if (config.styleUrl && !cmpxLib_1.CmpxLib.isString(config.styleUrl)) {
+                config.style = config.styleUrl();
+                config.styleUrl = null;
             }
-            if (vm.style) {
-                if (!cmpxLib_1.CmpxLib.isString(vm.style))
-                    vm.style = vm.style();
+            if (config.style) {
+                if (!cmpxLib_1.CmpxLib.isString(config.style))
+                    config.style = config.style();
                 head.appendChild(htmlDef_1.HtmlDef.getHtmlTagDef('style').createElement('style', [{
                         name: 'type', value: 'text/css'
-                    }], head, vm.style));
+                    }], head, config.style));
             }
-            if (vm.styleUrl) {
+            if (config.styleUrl) {
                 head.appendChild(htmlDef_1.HtmlDef.getHtmlTagDef('link').createElement('link', [{
                         name: 'rel', value: 'stylesheet'
                     }, {
-                        name: 'href', value: vm.styleUrl
+                        name: 'href', value: config.styleUrl
                     }], head));
             }
             //优先tmplUrl
-            var tmplUrl = vm.tmplUrl;
+            var tmplUrl = config.tmplUrl;
             if (cmpxLib_1.CmpxLib.isString(tmplUrl) && _loadTmplFn) {
                 _tmplCount++;
                 _loadTmplFn(tmplUrl, function (tmpl) {
-                    _registerVM[vm.name].render = new CompileRender(tmpl || vm.tmpl || '', constructor);
+                    context.render = new CompileRender(tmpl || config.tmpl || '', constructor);
                     _tmplCount--;
                     _tmplChk();
                 });
             }
             else
-                _registerVM[vm.name].render = new CompileRender(tmplUrl || vm.tmpl || '', constructor);
+                context.render = new CompileRender(tmplUrl || config.tmpl || '', constructor);
         };
         _readyRd ? rdF() : _renderPR.push(rdF);
-        constructor.prototype.$name = vm.name;
-        constructor.prototype[_vmName] = vm;
     };
 }
-exports.VM = VM;
+exports.VMComponet = VMComponet;
 var _tmplCount = 0, _tmplFnList = [], _tmplLoaded = function (callback) {
     if (_tmplCount == 0)
         callback && callback();
@@ -287,172 +519,14 @@ var _viewvarName = '__viewvar__', _getViewvarDef = function (componet) {
  * 引用模板变量$var
  * @param name 变量名称，未指定为属性名称
  */
-function viewvar(name) {
+function VMVar(name) {
     return function (componet, propKey) {
         name || (name = propKey);
         var vv = (componet[_viewvarName] || (componet[_viewvarName] = {}));
         vv[name || propKey] = propKey;
     };
 }
-exports.viewvar = viewvar;
-var CompileSubject = (function () {
-    function CompileSubject(subject, exclude) {
-        var _this = this;
-        /**
-         * 是否已经初始化
-         */
-        this.isInit = false;
-        /**
-         * 是否已分离
-         */
-        this.isDetach = false;
-        /**
-         * 是否已经准备
-         */
-        this.isReady = false;
-        /**
-         * 是否已经删除
-         */
-        this.isRemove = false;
-        if (subject) {
-            if (!(this.isRemove = subject.isRemove)) {
-                this.linkParam = subject.subscribe({
-                    init: function (p) { return (!exclude || !exclude.init) && _this.init(p); },
-                    update: function (p) { return (!exclude || !exclude.update) && _this.update(p); },
-                    ready: function (p) { return (!exclude || !exclude.ready) && _this.ready(p); },
-                    detach: function (p) { return (!exclude || !exclude.detach) && _this.detach(p); },
-                    remove: function (p) { return (!exclude || !exclude.remove) && _this.remove(p); }
-                });
-                this.subject = subject;
-                this.isInit = subject.isInit;
-                this.isReady = subject.isReady;
-            }
-        }
-    }
-    CompileSubject.prototype.subscribeIn = function (name, p) {
-        var listName = name + 'List', list = this[listName] || (this[listName] = []);
-        list.push(p[name]);
-    };
-    /**
-     * 观察
-     * @param p 观察内容
-     */
-    CompileSubject.prototype.subscribe = function (p) {
-        if (!this.isRemove) {
-            p.update && this.subscribeIn('update', p);
-            p.ready && this.subscribeIn('ready', p);
-            p.remove && this.subscribeIn('remove', p);
-            p.detach && this.subscribeIn('detach', p);
-            if (this.ready)
-                p.ready && p.ready(null);
-            else
-                p.ready && this.subscribeIn('ready', p);
-            if (this.isInit)
-                p.init && p.init(null);
-            else
-                p.init && this.subscribeIn('init', p);
-        }
-        return p;
-    };
-    CompileSubject.prototype.unSubscribeIn = function (name, p) {
-        var list = this[name + 'List'];
-        if (list) {
-            var index = list.indexOf(p[name]);
-            (index >= 0) && list.splice(index, 1);
-        }
-    };
-    /**
-     * 解除观察
-     * @param p 观察内容
-     */
-    CompileSubject.prototype.unSubscribe = function (p) {
-        if (!this.isRemove) {
-            p.update && this.unSubscribeIn('update', p);
-            p.ready && this.unSubscribeIn('ready', p);
-            p.detach && this.unSubscribeIn('detach', p);
-            p.remove && this.unSubscribeIn('remove', p);
-            p.init && this.unSubscribeIn('init', p);
-        }
-    };
-    /**
-     * 解除观察Subject
-     */
-    CompileSubject.prototype.unLinkSubject = function () {
-        this.subject && this.subject.unSubscribe(this.linkParam);
-        return this;
-    };
-    /**
-     * 发送初始化通知
-     * @param p 发送事件参数
-     */
-    CompileSubject.prototype.init = function (p) {
-        if (this.isRemove)
-            return;
-        this.isInit = true;
-        var list = this.initList;
-        this.initList = [];
-        cmpxLib_1.CmpxLib.each(list, function (fn) {
-            fn && fn(p);
-        });
-    };
-    /**
-     * 发送更新通知
-     * @param p 发送事件参数
-     */
-    CompileSubject.prototype.update = function (p) {
-        if (this.isRemove || this.isDetach)
-            return;
-        cmpxLib_1.CmpxLib.each(this.updateList, function (fn) {
-            fn && fn(p);
-        });
-    };
-    /**
-     * 发送分离通知，不删除
-     * @param p 发送事件参数
-     */
-    CompileSubject.prototype.detach = function (p) {
-        if (this.isRemove)
-            return;
-        this.isDetach = !this.isDetach;
-        cmpxLib_1.CmpxLib.each(this.detachList, function (fn) {
-            fn && fn(p);
-        });
-    };
-    /**
-     * 发送准备通知
-     * @param p 发送事件参数
-     */
-    CompileSubject.prototype.ready = function (p) {
-        if (this.isRemove)
-            return;
-        var list = this.readyList;
-        this.readyList = [];
-        cmpxLib_1.CmpxLib.each(list, function (fn) {
-            fn && fn(p);
-        });
-    };
-    /**
-     * 发送删除通知
-     * @param p 发送事件参数
-     */
-    CompileSubject.prototype.remove = function (p) {
-        if (this.isRemove)
-            return;
-        this.isRemove = true;
-        this.unLinkSubject();
-        var removeList = this.removeList;
-        this.clear();
-        cmpxLib_1.CmpxLib.each(removeList, function (fn) {
-            fn && fn(p);
-        });
-    };
-    CompileSubject.prototype.clear = function () {
-        this.initList = this.readyList
-            = this.updateList = this.removeList = null;
-    };
-    return CompileSubject;
-}());
-exports.CompileSubject = CompileSubject;
+exports.VMVar = VMVar;
 var _tmplName = '__tmpl__', _getComponetTmpl = function (componet, id) {
     var tmpls = componet[_tmplName];
     if (!tmpls || !tmpls[id])
@@ -490,6 +564,30 @@ var _tmplName = '__tmpl__', _getComponetTmpl = function (componet, id) {
     if ((!array1 || !array2))
         return array1 == array2;
     return array1.length == array2.length && _equalArrayIn(array1, array2);
+}, _equalObject = function (obj1, obj2) {
+    if (obj1 == obj2)
+        return true;
+    if (!cmpxLib_1.CmpxLib.isObject(obj2))
+        return false;
+    var count = 0, ok = true;
+    cmpxLib_1.CmpxLib.eachProp(obj1, function (item, n) {
+        count++;
+        if (obj2[n] !== item) {
+            ok = false;
+            return false;
+        }
+    });
+    ok && cmpxLib_1.CmpxLib.eachProp(obj2, function () {
+        count--;
+    });
+    return ok && (count === 0);
+}, _equals = function (p, p1) {
+    if (cmpxLib_1.CmpxLib.isArray(p))
+        return _equalArray(p, p1);
+    else if (cmpxLib_1.CmpxLib.isObject(p))
+        return _equalObject(p, p1);
+    else
+        return p == p1;
 }, _getParentElement = htmlDef_1.HtmlDef.getParentElement, _removeChildNodes = function (childNodes) {
     if (childNodes && childNodes.length > 0) {
         var pNode_1;
@@ -512,20 +610,27 @@ var _tmplName = '__tmpl__', _getComponetTmpl = function (componet, id) {
 var CompileRender = (function () {
     /**
      *
-     * @param tmpl html模板文本
+     * @param context (string | Function | Componet) html模板文本、编译后的function或Componet
      * @param componetDef 组件定义类，如果没有传为临时模板
      */
     function CompileRender(context, componetDef, param) {
-        this.componetDef = componetDef;
-        this.param = param;
-        var fn;
-        if (cmpxLib_1.CmpxLib.isString(context)) {
-            var tagInfos = _makeTagInfos(cmpxLib_1.CmpxLib.trim(context, true));
-            fn = _buildCompileFn(tagInfos);
+        if (context instanceof componet_1.Componet) {
+            this.componetDef = context;
+            var vm = VMManager.getComponet(context), render = vm && vm.render;
+            this.contextFn = render.contextFn;
         }
-        else
-            fn = context;
-        this.contextFn = fn;
+        else {
+            this.componetDef = componetDef;
+            this.param = param;
+            var fn = void 0;
+            if (cmpxLib_1.CmpxLib.isString(context)) {
+                var tagInfos = _makeTagInfos(cmpxLib_1.CmpxLib.trim(context, true));
+                fn = _buildCompileFn(tagInfos);
+            }
+            else
+                fn = context;
+            this.contextFn = fn;
+        }
     }
     /**
      * 编译并插入到document
@@ -538,10 +643,10 @@ var CompileRender = (function () {
         subject || (subject = (parentComponet ? parentComponet.$subject : null));
         subjectExclude || (subjectExclude = {});
         subjectExclude.ready = true;
-        var componet, isNewComponet = false, parentElement = _getParentElement(refNode), newSubject = new CompileSubject(subject, subjectExclude);
+        var componet, isNewComponet = false, parentElement = _getParentElement(refNode), newSubject = new compileSubject_1.CompileSubject(subject, subjectExclude);
         if (componetDef) {
             isNewComponet = true;
-            componet = new componetDef();
+            componet = componetDef instanceof componet_1.Componet ? componetDef : new componetDef();
             componet.$name = name;
             componet.$subject = newSubject;
             componet.$parentElement = parentElement;
@@ -557,12 +662,17 @@ var CompileRender = (function () {
         if (!componet) {
             throw new Error('render缺少Componet参数');
         }
+        var vmAttrs = _getVmAttrs(componet);
         cmpxLib_1.CmpxLib.each(attrs, function (item) {
-            componet[item.name] = item.value;
+            componet[(vmAttrs && vmAttrs[item.name]) || item.name] = item.value;
         });
         //注意parentElement问题，但现在context只能放{{tmpl}}
         contextFn && contextFn(componet, parentElement, newSubject, true);
+        var watchFn = isNewComponet ? _getWatchContext(componet) : null;
         newSubject.subscribe({
+            update: function () {
+                watchFn && watchFn();
+            },
             remove: function (p) {
                 var rmFn = function () {
                     var vv = _getViewvarDef(componet);
@@ -671,27 +781,66 @@ var Compile = (function () {
     Compile.loadTmplCfg = function (loadTmplFn) {
         _loadTmplFn = loadTmplFn;
     };
-    Compile.createElementEx = function (name, attrs, componet, parentElement, subject, contextFn, content) {
+    Compile.createElementEx = function (name, attrs, componet, parentElement, subject, contextFn, content, bindAttrs) {
         if (subject.isRemove)
             return;
-        if (_registerVM[name]) {
+        if (VMManager.getComponet(componet, name)) {
             Compile.createComponet.apply(this, arguments);
         }
         else {
             Compile.createElement.apply(this, arguments);
         }
     };
-    Compile.createElement = function (name, attrs, componet, parentElement, subject, contextFn, content) {
+    Compile.createElement = function (name, attrs, componet, parentElement, subject, contextFn, content, bindAttrs) {
         if (subject.isRemove)
             return;
-        var element = htmlDef_1.HtmlDef.getHtmlTagDef(name).createElement(name, attrs, parentElement, content);
+        var element = htmlDef_1.HtmlDef.getHtmlTagDef(name).createElement(name, attrs, parentElement, content, { subject: subject, componet: componet });
+        var attrList = [], bindList = [], binds = {}, vmAttrs, bindDef, bind, attrName, values = {};
+        var makeAttrs = function (binds, bind, attrs) {
+            cmpxLib_1.CmpxLib.eachProp(attrs, function (item, n) {
+                binds[n] = { bind: bind, attr: item, done: false };
+            });
+        };
+        cmpxLib_1.CmpxLib.each(attrs, function (item) {
+            attrName = item.name;
+            bindDef = _getBindDef(componet, attrName);
+            if (bindDef) {
+                bind = new bindDef(element);
+                bindList.push(bind);
+                vmAttrs = _getVmAttrs(bind);
+                bind['$name'] = attrName;
+                bind['$subject'] = subject;
+                bind['$componet'] = componet;
+                makeAttrs(binds, bind, vmAttrs);
+            }
+            values[attrName] = item.value;
+            attrList.push(item);
+        });
+        bindAttrs && cmpxLib_1.CmpxLib.each(bindAttrs.split(','), function (item) {
+            bindDef = _getBindDef(componet, item);
+            if (bindDef) {
+                bind = new bindDef(element);
+                bindList.push(bind);
+                vmAttrs = _getVmAttrs(bind);
+                bind['$name'] = item;
+                bind['$subject'] = subject;
+                bind['$componet'] = componet;
+                makeAttrs(binds, bind, vmAttrs);
+            }
+        });
         parentElement.appendChild(element);
-        contextFn && contextFn(componet, element, subject, false);
+        contextFn && contextFn(componet, element, subject, false, bind && binds);
+        bind && cmpxLib_1.CmpxLib.eachProp(binds, function (item, n) {
+            Compile.setBindAttribute(element, n, '', values[n], componet, subject, false, binds);
+        });
+        bindList.length > 0 && cmpxLib_1.CmpxLib.each(bindList, function (item) {
+            Compile.setBind(element, componet, subject, item);
+        });
     };
     Compile.createComponet = function (name, attrs, componet, parentElement, subject, contextFn) {
         if (subject.isRemove)
             return;
-        var vm = _registerVM[name], componetDef = vm.componetDef, refNode = _getRefNode(parentElement);
+        var vm = VMManager.getComponet(componet, name), componetDef = vm.componetDef, refNode = _getRefNode(parentElement);
         Compile.renderComponet(componetDef, refNode, attrs, function (subject, componet) {
         }, componet, subject, contextFn);
     };
@@ -705,16 +854,20 @@ var Compile = (function () {
             }
         });
     };
-    Compile.setAttributeEx = function (element, name, subName, content, componet, subject, isComponet) {
+    Compile.setAttributeEx = function (element, name, subName, content, componet, subject, isComponet, binds) {
         if (isComponet) {
             Compile.setAttributeCP.apply(this, arguments);
+        }
+        else if (binds && binds[name]) {
+            Compile.setBindAttribute.apply(this, arguments);
         }
         else {
             Compile.setAttribute.apply(this, arguments);
         }
     };
-    Compile.setAttributeCP = function (element, name, subName, content, componet, subject) {
-        var isObj = !cmpxLib_1.CmpxLib.isString(content), parent = componet.$parent;
+    Compile.setAttributeCP = function (element, name, subName, content, componet, subject, isComponet) {
+        var isObj = !cmpxLib_1.CmpxLib.isString(content), parent = componet.$parent, vmAttrs = _getVmAttrs(componet);
+        vmAttrs && (name = vmAttrs[name] || name);
         if (isObj) {
             var isEvent = !!content.event, update = void 0;
             if (isEvent) {
@@ -746,7 +899,7 @@ var Compile = (function () {
                 }, updateFn = function (p) {
                     if (isRead_1) {
                         newValue_1 = content.read.call(parent);
-                        if (value_1 != newValue_1) {
+                        if (!_equals(value_1, newValue_1)) {
                             value_1 = newValue_1;
                             componet[name] = value_1;
                             componet.$updateAsync();
@@ -761,7 +914,6 @@ var Compile = (function () {
                 }, pSubP_1 = isWrite_1 || isRead_1 ? parent.$subject.subscribe({
                     update: updateFn
                 }) : null;
-                var attrDef = htmlDef_1.HtmlDef.getHtmlAttrDef(name);
                 subject.subscribe({
                     update: updateFn,
                     remove: function () {
@@ -782,7 +934,7 @@ var Compile = (function () {
             update: function (p) {
                 if (!once && readFn) {
                     var newValue = readFn.call(componet);
-                    if (value != newValue) {
+                    if (!_equals(value, newValue)) {
                         value = newValue;
                         textNode[('textContent' in textNode) ? 'textContent' : 'nodeValue'] = newValue;
                     }
@@ -791,8 +943,8 @@ var Compile = (function () {
         });
         return textNode;
     };
-    Compile.setAttribute = function (element, name, subName, content, componet, subject) {
-        var isObj = !cmpxLib_1.CmpxLib.isString(content);
+    Compile.setAttribute = function (element, name, subName, content, componet, subject, isComponet) {
+        var isObj = !cmpxLib_1.CmpxLib.isString(content), compileInfo = { subject: subject, componet: componet };
         if (isObj) {
             var isEvent = !!content.event, update = void 0, eventDef_2;
             if (isEvent) {
@@ -803,19 +955,19 @@ var Compile = (function () {
                         if (isBind_2)
                             return;
                         isBind_2 = true;
-                        eventDef_2.addEventListener(element, name, eventFn_2, false);
+                        eventDef_2.addEventListener(element, name, eventFn_2, false, compileInfo);
                     },
                     remove: function (p) {
                         if (isBind_2) {
-                            eventDef_2.removeEventListener(element, name, eventFn_2, false);
+                            eventDef_2.removeEventListener(element, name, eventFn_2, false, compileInfo);
                         }
                     }
                 });
             }
             else {
                 var value_2 = '', newValue_2, isWrite_2 = !!content.write, isRead_2 = !!content.read, writeFn_2 = function () {
-                    newValue_2 = attrDef_1.getAttribute(element, name);
-                    if (value_2 != newValue_2) {
+                    newValue_2 = attrDef_1.getAttribute(element, name, '', compileInfo);
+                    if (!_equals(value_2, newValue_2)) {
                         value_2 = newValue_2;
                         content.write.call(componet, newValue_2);
                         componet.$updateAsync();
@@ -828,28 +980,114 @@ var Compile = (function () {
                         eventDef_2.addEventListener(element, item, writeFn_2, false);
                     });
                 }
+                attrDef_1.initAttribute && attrDef_1.initAttribute(element, name, isRead_2 ? content.read.call(componet) : '', subName, compileInfo);
                 subject.subscribe({
                     update: function (p) {
                         if (isRead_2) {
                             newValue_2 = content.read.call(componet);
-                            if (value_2 != newValue_2) {
+                            if (!_equals(value_2, newValue_2)) {
                                 value_2 = newValue_2;
-                                attrDef_1.setAttribute(element, name, value_2, subName);
+                                attrDef_1.setAttribute(element, name, value_2, subName, compileInfo);
                             }
                         }
                     },
                     remove: function (p) {
                         if (isWrite_2) {
                             cmpxLib_1.CmpxLib.each(writeEvent_1, function (item) {
-                                eventDef_2.removeEventListener(element, item, writeFn_2, false);
+                                eventDef_2.removeEventListener(element, item, writeFn_2, false, compileInfo);
                             });
                         }
                     }
                 });
             }
         }
-        else
-            htmlDef_1.HtmlDef.getHtmlAttrDef(name).setAttribute(element, name, content);
+        else {
+            var attrDef = htmlDef_1.HtmlDef.getHtmlAttrDef(name);
+            attrDef.initAttribute && attrDef.initAttribute(element, name, content, subName, compileInfo);
+            attrDef.setAttribute(element, name, content, subName, compileInfo);
+        }
+    };
+    Compile.setBindAttribute = function (element, name, subName, content, componet, subject, isComponet, binds) {
+        var bindInfo = binds[name];
+        if (bindInfo.done)
+            return;
+        bindInfo.done = true;
+        var bind = bindInfo.bind, bindAttrName = '__bindAttr__', bindAttrs = bind[bindAttrName] || (bind[bindAttrName] = []), isObj = content && !cmpxLib_1.CmpxLib.isString(content), names = _makeSubName(name);
+        bindAttrs.push({
+            isObj: isObj,
+            attrName: bindInfo.attr,
+            attrDef: htmlDef_1.HtmlDef.getHtmlAttrDef(name),
+            content: content,
+            isWrite: isObj ? !!content.write : false,
+            isRead: isObj ? !!content.read : true,
+            name: names[0],
+            subName: names[1]
+        });
+        if (!isObj)
+            bind[bindInfo.attr] = content;
+    };
+    Compile.setBind = function (element, componet, subject, bind) {
+        var bindEvents = _getBindEvents(bind), events = [];
+        if (bindEvents) {
+            cmpxLib_1.CmpxLib.each(bindEvents, function (item) {
+                var name = item.name, fn = function () { return item.fn.apply(bind, arguments); };
+                events.push({ name: name, fn: fn });
+                htmlDef_1.HtmlDef.getHtmlEventDef(name).addEventListener(element, name, fn, false);
+            });
+        }
+        var bindAttrName = '__bindAttr__', bindAttrs = bind[bindAttrName], compileInfo = { subject: subject, componet: componet }, isChange, writeFn = function (item) {
+            item.newValue = bind[item.attrName];
+            if (!_equals(item.value, item.newValue)) {
+                isChange = true;
+                item.value = item.newValue;
+                item.content.write.call(componet, item.newValue);
+            }
+        }, update = function () {
+            cmpxLib_1.CmpxLib.each(bindAttrs, function (item) {
+                if (item.isRead) {
+                    item.newValue = item.isObj ? item.content.read.call(componet)
+                        : bind[item.attrName];
+                    if (!_equals(item.value, item.newValue)) {
+                        isChange = true;
+                        item.value = item.newValue;
+                        bind[item.attrName] = item.value;
+                        item.attrDef.setAttribute(element, item.name, item.value, item.subName, compileInfo);
+                    }
+                    else
+                        writeFn(item);
+                }
+                else if (item.isWrite)
+                    writeFn(item);
+            });
+        }, doUpdate = function () {
+            isChange = false;
+            update();
+            isChange && bind.onChanged();
+            if (isChange) {
+                doUpdate();
+            }
+        };
+        bind[bindAttrName] = _undef;
+        var watchFn = _getWatchContext(bind);
+        subject.subscribe({
+            update: function (p) {
+                doUpdate();
+                watchFn && watchFn();
+                bind.onUpdate();
+            },
+            ready: function () {
+                bind.onReady();
+            },
+            remove: function (p) {
+                bind.$isDisposed = true;
+                bind.onDispose();
+                if (bindEvents) {
+                    cmpxLib_1.CmpxLib.each(events, function (item) {
+                        htmlDef_1.HtmlDef.getHtmlEventDef(item.name).removeEventListener(element, item.name, item.fn, false);
+                    });
+                }
+            }
+        });
     };
     Compile.forRender = function (dataFn, eachFn, componet, parentElement, insertTemp, subject, syncFn) {
         if (subject.isRemove || !dataFn || !eachFn)
@@ -970,7 +1208,7 @@ var Compile = (function () {
                                 }
                                 else {
                                     //如果不存在，新建
-                                    var st = item.subject = new CompileSubject(subject);
+                                    var st = item.subject = new compileSubject_1.CompileSubject(subject);
                                     fragm = document.createDocumentFragment();
                                     item.fn = eachFn.call(componet, item.data, count_1, index, componet, fragm, st);
                                     item.nodes = cmpxLib_1.CmpxLib.toArray(fragm.childNodes);
@@ -990,7 +1228,7 @@ var Compile = (function () {
                             newSubject && newSubject.remove({
                                 componet: componet
                             });
-                            newSubject = new CompileSubject(subject);
+                            newSubject = new compileSubject_1.CompileSubject(subject);
                             cmpxLib_1.CmpxLib.each(datas, function (item, index) {
                                 eachFn.call(componet, item, count_1, index, componet, fragment_2, newSubject);
                             });
@@ -1068,7 +1306,7 @@ var Compile = (function () {
                                 });
                             }
                             else {
-                                trueSubject = new CompileSubject(subject);
+                                trueSubject = new compileSubject_1.CompileSubject(subject);
                                 fragment = document.createDocumentFragment();
                                 trueFn.call(componet, componet, fragment, trueSubject);
                                 trueNodes = cmpxLib_1.CmpxLib.toArray(fragment.childNodes);
@@ -1087,7 +1325,7 @@ var Compile = (function () {
                                 });
                             }
                             else {
-                                falseSubject = new CompileSubject(subject);
+                                falseSubject = new compileSubject_1.CompileSubject(subject);
                                 fragment = document.createDocumentFragment();
                                 falseFn.call(componet, componet, fragment, falseSubject);
                                 falseNodes = cmpxLib_1.CmpxLib.toArray(fragment.childNodes);
@@ -1105,7 +1343,7 @@ var Compile = (function () {
                         newSubject && newSubject.remove({
                             componet: componet
                         });
-                        newSubject = new CompileSubject(subject);
+                        newSubject = new compileSubject_1.CompileSubject(subject);
                         fragment = document.createDocumentFragment();
                         if (newValue)
                             trueFn.call(componet, componet, fragment, newSubject);
@@ -1135,7 +1373,7 @@ var Compile = (function () {
         tmpls[id] = function (componet, element, subject, param) {
             if ($componet != componet) {
                 //如果tmpl在不同的component, 将this为当前域，夸域处理
-                subject = new CompileSubject(subject);
+                subject = new compileSubject_1.CompileSubject(subject);
                 var pSubject_1 = $componet.$subject, subsP_1 = pSubject_1.subscribe({
                     update: function (p) {
                         subject.update(p);
@@ -1170,16 +1408,17 @@ var Compile = (function () {
             }
         }
         else {
-            var render_1, preSubject_1, preComponet_1, refNode_1 = _getRefNode(parentElement);
+            var value_3, preSubject_1, preComponet_1, refNode_1 = _getRefNode(parentElement);
             subject.subscribe({
                 update: function (p) {
-                    var newRender = context.call(componet);
-                    if (newRender != render_1) {
-                        render_1 = newRender;
+                    var newValue = context.call(componet);
+                    if (newValue != value_3) {
+                        value_3 = newValue;
+                        var render = new CompileRender(newValue);
                         preSubject_1 && preSubject_1.remove({
                             componet: preComponet_1
                         });
-                        var _a = newRender.complie(refNode_1, [], componet, subject, null, null, param), newSubject = _a.newSubject, refComponet = _a.refComponet;
+                        var _a = render.complie(refNode_1, [], componet, subject, null, null, param), newSubject = _a.newSubject, refComponet = _a.refComponet;
                         preSubject_1 = newSubject;
                         preComponet_1 = refComponet;
                     }
@@ -1189,16 +1428,16 @@ var Compile = (function () {
                         });
                 },
                 remove: function (p) {
-                    render_1 = preSubject_1 = preComponet_1 = refNode_1 = null;
+                    value_3 = preSubject_1 = preComponet_1 = refNode_1 = null;
                 }
             });
         }
     };
     Compile.renderComponet = function (componetDef, refNode, attrs, complieEnd, parentComponet, subject, contextFn) {
         _tmplLoaded(function () {
-            var vm = _getVmByComponetDef(componetDef), render = vm && vm.render;
-            if (!vm)
-                throw new Error('not find @VM default!');
+            var isComponet = componetDef instanceof componet_1.Componet, vm = isComponet ? null : VMManager.getComponet(VMManager.getTarget(componetDef, componet_1.Componet)), render = isComponet ? new CompileRender(componetDef) : (vm && vm.render);
+            if (!render)
+                throw new Error('not find VM default!');
             var _a = render.complie(refNode, attrs, parentComponet, subject, contextFn, { update: true }), newSubject = _a.newSubject, refComponet = _a.refComponet;
             complieEnd && complieEnd.call(refComponet, newSubject, refComponet);
         });
@@ -1221,25 +1460,26 @@ var _buildCompileFn = function (tagInfos) {
     else
         return [name, ''];
 }, _makeElementTag = function (tagName, attrs) {
-    var bindAttrs = [], stAtts = [], names;
+    var bindAttrs = [], stAtts = [], names, bindNames = [], name;
     cmpxLib_1.CmpxLib.each(attrs, function (item) {
-        if (item.name == '$var' || item.name == '$array')
+        name = item.name;
+        if (name == '$var' || name == '$array')
             return;
         if (item.bind)
-            bindAttrs.push(item);
+            bindAttrs.push(item), bindNames.push(name);
         else {
-            names = _makeSubName(item.name);
+            names = _makeSubName(name);
             stAtts.push({ name: names[0], value: _escapeBuildString(item.value), subName: names[1] });
         }
     });
-    return { bindAttrs: bindAttrs, stAtts: stAtts };
+    return { bindAttrs: bindAttrs, stAtts: stAtts, bindNames: bindNames };
 }, _buildAttrContent = function (attrs, outList) {
     if (!attrs)
         return;
     var names;
     cmpxLib_1.CmpxLib.each(attrs, function (attr, index) {
         names = _makeSubName(attr.name);
-        outList.push('__setAttributeEx(element, "' + names[0] + '", "' + names[1] + '", ' + attr.bindInfo.content + ', componet, subject, isComponet);');
+        outList.push('__setAttributeEx(element, "' + names[0] + '", "' + names[1] + '", ' + attr.bindInfo.content + ', componet, subject, isComponet, binds);');
     });
 }, _getViewvarName = function (attrs) {
     var name = { item: null, list: null }, has = false;
@@ -1292,8 +1532,8 @@ var _buildCompileFn = function (tagInfos) {
                 //如果rawTag没有子级
                 hasChild && (hasChild = !rawTag);
                 if (hasAttr || hasChild || varName) {
-                    var _a = _makeElementTag(tagName, tag.attrs), bindAttrs = _a.bindAttrs, stAtts = _a.stAtts;
-                    outList.push('__createElementEx("' + tagName + '", ' + JSON.stringify(stAtts) + ', componet, element, subject, function (componet, element, subject, isComponet) {');
+                    var _a = _makeElementTag(tagName, tag.attrs), bindAttrs = _a.bindAttrs, stAtts = _a.stAtts, bindNames = _a.bindNames;
+                    outList.push('__createElementEx("' + tagName + '", ' + JSON.stringify(stAtts) + ', componet, element, subject, function (componet, element, subject, isComponet, binds) {');
                     if (varName) {
                         outList.push('__setViewvar(function(){');
                         varName.item && outList.push(varName.item + ' = this;');
@@ -1307,7 +1547,7 @@ var _buildCompileFn = function (tagInfos) {
                     }
                     _buildAttrContent(bindAttrs, outList);
                     hasChild && _buildCompileFnContent(tag.children, outList, varNameList, preInsert);
-                    outList.push('}, "' + _escapeBuildString(tagContent) + '");');
+                    outList.push('}, "' + _escapeBuildString(tagContent) + '", "' + bindNames.join(',') + '");');
                 }
                 else {
                     outList.push('__createElementEx("' + tagName + '", [], componet, element, subject, null, "' + _escapeBuildString(tagContent) + '");');

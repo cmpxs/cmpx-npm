@@ -28,5 +28,12 @@ export declare class CmpxLib {
     };
     static each(list: any, fn: (item: any, idx: number) => any, thisArg?: any): void;
     static eachProp(obj: any, callback: (item: any, name: string) => void, thisArg?: any): void;
-    static extend(obj: Object, p: Object): Object;
+    static extend(obj: Object, ...args: Object[]): Object;
+    static makeAutoId(): string;
+    /**
+     * 是否类
+     * @param p 参数
+     * @param cls 类
+     */
+    static isClass(p: any, cls: any): boolean;
 }

@@ -11,6 +11,7 @@ var __extends = (this && this.__extends) || (function () {
 })();
 exports.__esModule = true;
 var platform_1 = require("./platform");
+var componet_1 = require("./componet");
 var compile_1 = require("./compile");
 var htmlDef_1 = require("./htmlDef");
 var cmpxLib_1 = require("./cmpxLib");
@@ -101,12 +102,12 @@ var Browser = (function (_super) {
         var _this = _super.call(this) || this;
         //htmlDef配置
         _htmlConfig();
-        //编译器启动，用于htmlDef配置后
-        compile_1.Compile.startUp();
         return _this;
     }
-    Browser.prototype.boot = function (componetDef) {
-        var name = componetDef.prototype.$name, bootElement = document.getElementsByTagName(name)[0];
+    Browser.prototype.boot = function (componetDef, callback) {
+        //编译器启动，用于htmlDef配置后
+        compile_1.Compile.startUp();
+        var name = compile_1.VMManager.getTarget(componetDef, componet_1.Componet).$name, bootElement = document.getElementsByTagName(name)[0];
         if (!bootElement)
             throw new Error("\u6CA1\u6709" + name + "\u6807\u7B7E");
         var _doc = document, parentElement = _getParentElement(bootElement);
@@ -131,6 +132,7 @@ var Browser = (function (_super) {
                     });
                 };
                 window.addEventListener('unload', _unload, false);
+                callback && callback(refComponet, newSubject);
             });
         };
         if (/loaded|complete|undefined/i.test(_doc.readyState))

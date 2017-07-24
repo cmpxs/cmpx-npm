@@ -1,9 +1,9 @@
-import { CompileSubject, CompileRender } from './compile';
+import { CompileSubject } from './compileSubject';
 export declare class Componet {
     readonly $name: string;
+    readonly $subject: CompileSubject;
     readonly $parent: Componet;
     readonly $children: Array<Componet>;
-    readonly $subject: CompileSubject;
     readonly $parentElement: HTMLElement;
     /**
      * 更新View，View与Componet数据同步
@@ -11,6 +11,7 @@ export declare class Componet {
      */
     $update(p?: any): void;
     private updateId;
+    private clearUpdateTime();
     /**
      * 步异步更新View，View与Componet数据同步
      * @param p 传入参数
@@ -19,10 +20,9 @@ export declare class Componet {
     /**
      * 将模板生成CompileRender, 用于include标签动态绑定用
      * 注意动态模板里不要模板变量(viewvar)，请参数p传入，原因编译压缩后模板变量会改变
-     * @param tmpl 模板文本
-     * @param p 传入模板参数
+     * @param context 模板文本
      */
-    $render(tmpl: string | Function): CompileRender;
+    $render(context: string | Function | Componet): any;
     /**
      * 在解释View之前触发，一般准备数据用
      * @param cb 处理完成后，通知继续处理
@@ -53,5 +53,4 @@ export declare class Componet {
      * 在componet释放前触发
      */
     onDispose(): void;
-    constructor();
 }

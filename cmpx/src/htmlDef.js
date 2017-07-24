@@ -8,7 +8,7 @@ var cmpxLib_1 = require("./cmpxLib");
  * @param parent 父element
  * @param content 内容, contentType为RAW_TEXT或RAW_TEXT时会传入
  */
-function DEFAULT_CREATEELEMENT(name, attrs, parent, content) {
+function DEFAULT_CREATEELEMENT(name, attrs, parent, content, complieInfo) {
     var element = document.createElement(name);
     cmpxLib_1.CmpxLib.each(attrs, function (item) {
         HtmlDef.getHtmlAttrDef(item.name).setAttribute(element, item.name, item.value, item.subName);
@@ -87,13 +87,13 @@ function _removeSpace(html) {
  * 默认HtmlAttr定义
  */
 exports.DEFAULT_ATTR = {
-    setAttribute: function (element, name, value, subName) {
+    setAttribute: function (element, name, value, subName, complieInfo) {
         if (subName)
             element[name][subName] = value;
         else
             element.setAttribute(name, cmpxLib_1.CmpxLib.toStr(value));
     },
-    getAttribute: function (element, name, subName) {
+    getAttribute: function (element, name, subName, complieInfo) {
         if (subName)
             return element[name][subName];
         else
@@ -104,13 +104,13 @@ exports.DEFAULT_ATTR = {
  * 默认HtmlAttr prop定义
  */
 exports.DEFAULT_ATTR_PROP = {
-    setAttribute: function (element, name, value, subName) {
+    setAttribute: function (element, name, value, subName, complieInfo) {
         if (subName)
             element[name][subName] = name == 'value' ? cmpxLib_1.CmpxLib.toStr(value) : value;
         else
             element[name] = name == 'value' ? cmpxLib_1.CmpxLib.toStr(value) : value;
     },
-    getAttribute: function (element, name, subName) {
+    getAttribute: function (element, name, subName, complieInfo) {
         if (subName)
             return element[name][subName];
         else
@@ -129,11 +129,11 @@ var _htmlAttrDefConfig = {
  * 默认事件定义
  */
 exports.DEFAULT_EVENT_DEF = {
-    addEventListener: function (element, eventName, context, useCapture) {
+    addEventListener: function (element, eventName, context, useCapture, complieInfo) {
         element.addEventListener(eventName, context, useCapture);
         //attachEvent
     },
-    removeEventListener: function (element, eventName, context, useCapture) {
+    removeEventListener: function (element, eventName, context, useCapture, complieInfo) {
         element.removeEventListener(eventName, context, useCapture);
         //detachEvent
     }
@@ -160,6 +160,13 @@ var HtmlDef = (function () {
     HtmlDef.extendHtmlTagDef = function (p) {
         _extend(_htmlTagDefConfig, p);
         _makeSpecTags();
+    };
+    /**
+     * 是否有属性定义
+     * @param name
+     */
+    HtmlDef.hasHtmlAttrDef = function (name) {
+        return !!_htmlAttrDefConfig[name.toLowerCase()];
     };
     /**
      * 获取属性定义
