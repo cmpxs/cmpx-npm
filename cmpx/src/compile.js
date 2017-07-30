@@ -26,6 +26,37 @@ function VMBind(config) {
     };
 }
 exports.VMBind = VMBind;
+var Filter = (function () {
+    function Filter() {
+    }
+    Filter.prototype.onFilter = function (value, param, cb, componet, element) {
+        cb(value);
+    };
+    ;
+    return Filter;
+}());
+exports.Filter = Filter;
+var _getVMFilter = function (target, name) {
+    var context = VMManager.getFilter(target, name);
+    return context ? { filter: context.filter, alway: context.alway } : null;
+};
+/**
+ * 注入组件配置信息
+ * @param config
+ */
+function VMFilter(config) {
+    return function (constructor) {
+        var target = constructor.prototype, context = {
+            name: config.name,
+            type: 'Filter',
+            alway: config.alway !== false,
+            filter: new constructor()
+        };
+        VMManager.setConfig(target, config);
+        VMManager.include(target, context, null);
+    };
+}
+exports.VMFilter = VMFilter;
 var _attrEventName = 'events', _getBindEvents = function (bind) {
     return VMManager.getVM(bind, _attrEventName);
 };
@@ -182,7 +213,8 @@ _tagInfoRegex = /\<\s*(\/*)\s*([^<>\s]+)\s*([^<>]*?)(\/*)\s*\>|\{\{\s*(\/*)\s*([
         }
         var cmd = !!txtName, htmlTagDef = cmd ? null : htmlDef_1.HtmlDef.getHtmlTagDef(tagName), single = !!end2 || !!txtEnd2 || (cmd ? (_singleCmd[txtName] && !!txtEnd2) : htmlTagDef.single), end = !!end1 || !!txtEnd1 || single;
         if (!(single && (!!end1 || !!txtEnd1))) {
-            var attrs = !cmd && !!tagContent ? _getAttrInfos(tagContent) : null;
+            //var attrs = !cmd && !!tagContent ? _getAttrInfos(tagContent) : null;
+            var attrs;
             if (cmd) {
                 if ((single || !end)) {
                     switch (txtName) {
@@ -244,6 +276,8 @@ _attrInfoRegex = /\s*([^= ]+)\s*=\s*(?:(["'])((?:.|\n|\r)*?)\2|([^"' ><]*))|\s*(
 //获取cmd form attrInfo
 //_forAttrRegex = /\s*([^\s]+)\s*\in\s*([^\s]+)\s*(?:\s*tmpl\s*=\s*([\'\"])(.*?)\3)*/i,
 _forAttrRegex = /\s*([^\s]+)\s*\in\s*([^\s]+)\s*(?:\s*(sync)(?:\s*=\s*([\'\"])(.*?)\4)*)*/i, _getForAttrInfos = function (content) {
+    var filter = _getFilterInfos(content);
+    content = filter.value;
     var extend = _forAttrRegex.exec(content);
     var attrs = [{
             name: '',
@@ -253,17 +287,28 @@ _forAttrRegex = /\s*([^\s]+)\s*\in\s*([^\s]+)\s*(?:\s*(sync)(?:\s*=\s*([\'\"])(.
                 item: extend[1],
                 datas: extend[2],
                 sync: !!extend[3],
-                syncCT: extend[5]
+                syncCT: extend[5],
+                filters: filter.has ? filter.filters : null
             }
         }];
     return attrs;
-}, _bindTypeRegex = /^\s*([\<\>\:\@\#])\s*(.*)/, _removeEmptySplitRegex = /^['"]{2,2}\+|\+['"]{2,2}/g, _onlyBindRegex = /^\$\(\$[^$]*\$\)\$$/, 
+}, _bindTypeRegex = /^\s*([\<\>\:\@\#])\s*(.*)/, _removeEmptySplitRegex = /^['"]{2,2}\+|\+['"]{2,2}/g, _onlyBindRegex = /^\$\(\$[^$]*\$\)\$$/, _pushFilterCT = function (filterList, filters, context) {
+    var len = filterList.length, fts = [];
+    cmpxLib_1.CmpxLib.each(filters, function (item) {
+        fts.push(['{ filter:"', item.name, '"', (item.context ? [',  fn:function(){ return ', item.context, '; }'].join('') : ''), ' }'].join(''));
+    });
+    var str = ['var filter', len, ' = __filter(componet, element, subject, [', fts.join(','), '], function(){ return ', context, '; });'].join('');
+    filterList.push(str);
+    return len;
+}, 
 //获取内容绑定信息，如 name="aaa{{this.name}}"
 _getBind = function (value, split) {
     value = _escapeBuildString(value);
-    var write, event, onceList = [], read = false, isOnce = false, onlyBing = _onlyBindRegex.test(value), readTxt;
+    var write, event, onceList = [], read = false, isOnce = false, onlyBing = _onlyBindRegex.test(value), readTxt, filterList = [];
     var type = '', reg, readContent = [split, value.replace(_cmdDecodeAttrRegex, function (find, content, index) {
             content = decodeURIComponent(content);
+            var filter = _getFilterInfos(content), hasFilter = filter.has;
+            content = filter.value;
             reg = _bindTypeRegex.exec(content);
             var txt;
             if (reg) {
@@ -275,11 +320,19 @@ _getBind = function (value, split) {
                 txt = content;
             }
             readTxt = '';
+            var ftPos, ftName;
             switch (type) {
                 case ':'://一次只读
-                    onceList.push(txt);
                     isOnce = true;
-                    readTxt = onlyBing ? 'once0' : [split, 'once' + (onceList.length - 1), split].join('+');
+                    if (hasFilter) {
+                        ftPos = _pushFilterCT(filterList, filter.filters, txt);
+                        ftName = ['CmpxLib.toStr(val', ftPos, ')'].join('');
+                        readTxt = onlyBing ? ftName : [split, ftName, split].join('+');
+                    }
+                    else {
+                        onceList.push(txt);
+                        readTxt = onlyBing ? 'once0' : [split, 'once' + (onceList.length - 1), split].join('+');
+                    }
                     break;
                 case '@'://事件
                     event = txt;
@@ -292,18 +345,24 @@ _getBind = function (value, split) {
                 case '<': //只读
                 default:
                     read = true;
-                    readTxt = onlyBing ? txt : [split, 'CmpxLib.toStr(' + txt + ')', split].join('+');
+                    if (hasFilter) {
+                        ftPos = _pushFilterCT(filterList, filter.filters, txt);
+                        ftName = ['CmpxLib.toStr(val', ftPos, ')'].join('');
+                        readTxt = onlyBing ? ftName : [split, ftName, split].join('+');
+                    }
+                    else {
+                        readTxt = onlyBing ? txt : [split, 'CmpxLib.toStr(' + txt + ')', split].join('+');
+                    }
                     break;
             }
             return readTxt;
         }), split].join('');
     if (onlyBing) {
-        readContent = isOnce ? 'once0' : readTxt;
+        readContent = readTxt;
     }
-    //readContent = readContent.replace(_removeEmptySplitRegex, '');
     var once;
     if (write || read || isOnce || onceList.length > 0) {
-        if (isOnce) {
+        if (isOnce && onceList.length > 0) {
             var oList_1 = [];
             cmpxLib_1.CmpxLib.each(onceList, function (item, index) {
                 oList_1.push(['once', index, ' = ', onlyBing ? item : ('CmpxLib.toStr(' + item + ')')].join(''));
@@ -316,8 +375,20 @@ _getBind = function (value, split) {
     else if (event) {
         event = 'function(event){ ' + event + '; }';
     }
-    readContent = "(function(){\n  " + (once ? once : '') + "\n  return {\n    once:" + (once ? (read ? 'false' : 'true') : 'false') + ",\n    read:" + (read || isOnce ? 'function(){ return ' + readContent + '; }' : 'null') + ",\n    write:" + (write ? write : 'null') + ",\n    event:" + (event ? event : 'null') + "\n  };\n}).call(componet)";
-    return { type: type, content: readContent };
+    var ftLen = filterList.length, hasFt = ftLen > 0;
+    if (hasFt) {
+        var ftNList = [], ftVList = [];
+        for (var i = 0; i < ftLen; i++) {
+            ftNList.push('filter' + i);
+            ftVList.push('val' + i);
+        }
+        readContent = read || isOnce ? 'function(cb){ __mergerFilter(componet, [' + ftNList.join(',') + '], function(' + ftVList.join(',') + '){ cb(' + readContent + '); }); }' : 'null';
+    }
+    else {
+        readContent = read || isOnce ? 'function(cb){ cb(' + readContent + '); }' : 'null';
+    }
+    var bindContent = "(function(){\n  " + (once ? once : '') + "\n  " + (hasFt ? filterList.join("\n") : '') + "\n\n  return {\n    once:" + (once ? (read ? 'false' : 'true') : 'false') + ",\n    read:" + readContent + ",\n    write:" + (write ? write : 'null') + ",\n    event:" + (event ? event : 'null') + "\n  };\n}).call(componet)";
+    return { type: type, content: bindContent };
 }, _makeTagInfoChildren = function (attrs, outList, len, index, parent) {
     if (index === void 0) { index = 0; }
     if (parent === void 0) { parent = null; }
@@ -343,6 +414,21 @@ _getBind = function (value, split) {
         }
     }
     return index;
+}, _filterRegex = /([|]+)[ ]?([^|]+)/g, _getFilterInfos = function (value) {
+    var filters = [], tList;
+    value = value.replace(_filterRegex, function (find, split, contant) {
+        if (split == '|') {
+            tList = contant.split(':');
+            filters.push({
+                name: cmpxLib_1.CmpxLib.trim(tList[0]),
+                context: cmpxLib_1.CmpxLib.trim(tList[1])
+            });
+            return '';
+        }
+        else
+            return find;
+    });
+    return { value: cmpxLib_1.CmpxLib.trim(value), filters: filters, has: filters.length > 0 };
 };
 var _vmName = "__vm__", _vmConfigName = 'config', _vmContextName = 'context', _vmOtherName = 'other';
 var VMManager = (function () {
@@ -374,22 +460,15 @@ var VMManager = (function () {
     VMManager.include = function (target, context, include, parent) {
         var obj = {
             parent: null,
-            context: context,
-            componets: {},
-            binds: {}
+            context: context
         }, temp;
         var a;
         cmpxLib_1.CmpxLib.each(include, function (item) {
             temp = this.getContext(item.prototype);
             if (temp) {
-                switch (temp.type) {
-                    case 'Componet':
-                        obj.componets[temp.name] = temp;
-                        break;
-                    case 'Bind':
-                        obj.binds[temp.name] = temp;
-                        break;
-                }
+                var type = temp.type;
+                obj[type] || (obj[type] = {});
+                obj[type][temp.name] = temp;
             }
         }, this);
         return this.setVM(target, _vmContextName, obj);
@@ -406,13 +485,18 @@ var VMManager = (function () {
         }
         return cp || (parent && this.getContextEx(parent, type, name));
     };
-    VMManager.getComponet = function (target, name) {
-        return name ? this.getContextEx(target, 'componets', name)
+    VMManager.getContextByType = function (target, type, name) {
+        return name ? this.getContextEx(target, type, name)
             : this.getContext(target);
     };
+    VMManager.getComponet = function (target, name) {
+        return this.getContextByType(target, 'Componet', name);
+    };
     VMManager.getBind = function (target, name) {
-        return name ? this.getContextEx(target, 'binds', name)
-            : this.getContext(target);
+        return this.getContextByType(target, 'Bind', name);
+    };
+    VMManager.getFilter = function (target, name) {
+        return this.getContextByType(target, 'Filter', name);
     };
     /**
      * 配置
@@ -606,6 +690,10 @@ var _tmplName = '__tmpl__', _getComponetTmpl = function (componet, id) {
         return fragment_1;
     }
     return null;
+}, _textContentName, _setTextNode = function (textNode, content) {
+    if (!_textContentName)
+        _textContentName = ('textContent' in textNode) ? 'textContent' : 'nodeValue';
+    textNode[_textContentName] = content;
 };
 var CompileRender = (function () {
     /**
@@ -778,6 +866,63 @@ var Compile = (function () {
         });
         _renderPR = null;
     };
+    Compile.filter = function (componet, element, subject, filters, context) {
+        var filterList = [];
+        cmpxLib_1.CmpxLib.each(filters, function (item) {
+            var ft = _getVMFilter(componet, item.filter);
+            if (ft) {
+                filterList.push({
+                    filter: ft.filter,
+                    alway: ft.alway,
+                    fn: item.fn
+                });
+            }
+        });
+        var count = filterList.length, result, filterResult = function (filter, alway, p, index, cb) {
+            if (alway || !_equals(filter.result, result)) {
+                filter.result = result;
+                filter.onFilter(result, p, function (r) {
+                    result = filter.valuePre = r;
+                    filterResultLop(++index, cb);
+                }, componet, element);
+            }
+            else {
+                result = filter.valuePre;
+                filterResultLop(++index, cb);
+            }
+        }, filterResultLop = function (index, cb) {
+            if (index == count) {
+                cb(result);
+                return;
+            }
+            var item = filterList[index];
+            return filterResult(item.filter, item.alway, item.fn && item.fn.call(componet), index, cb);
+        };
+        var filterContext = function (cb) {
+            result = context.call(componet);
+            if (count > 0) {
+                filterResultLop(0, cb);
+            }
+            else
+                cb(result);
+        };
+        return filterContext;
+    };
+    Compile.mergerFilter = function (componet, filters, cb) {
+        var count = filters.length;
+        if (count > 0) {
+            var results_1 = [];
+            cmpxLib_1.CmpxLib.each(filters, function (item, index) {
+                item.call(componet, function (r) {
+                    results_1[index] = r;
+                    if (--count == 0)
+                        cb.apply(componet, results_1);
+                });
+            });
+        }
+        else
+            cb.call(componet);
+    };
     Compile.loadTmplCfg = function (loadTmplFn) {
         _loadTmplFn = loadTmplFn;
     };
@@ -898,15 +1043,16 @@ var Compile = (function () {
                     }
                 }, updateFn = function (p) {
                     if (isRead_1) {
-                        newValue_1 = content.read.call(parent);
-                        if (!_equals(value_1, newValue_1)) {
-                            value_1 = newValue_1;
-                            componet[name] = value_1;
-                            componet.$updateAsync();
-                        }
-                        else if (isWrite_1) {
-                            writeFn_1(p);
-                        }
+                        content.read.call(parent, function (newValue) {
+                            if (!_equals(value_1, newValue)) {
+                                value_1 = newValue;
+                                componet[name] = value_1;
+                                componet.$updateAsync();
+                            }
+                            else if (isWrite_1) {
+                                writeFn_1(p);
+                            }
+                        });
                     }
                     else if (isWrite_1) {
                         writeFn_1(p);
@@ -928,19 +1074,29 @@ var Compile = (function () {
     Compile.createTextNode = function (content, componet, parentElement, subject) {
         if (subject.isRemove)
             return;
-        var isObj = !cmpxLib_1.CmpxLib.isString(content), value = '', once = isObj ? content.once : false, readFn = isObj ? content.read : null, textNode = document.createTextNode(isObj ? (once ? readFn.call(componet) : value) : content);
+        var isObj = !cmpxLib_1.CmpxLib.isString(content), once = isObj ? content.once : false, textNode = document.createTextNode(''), readFn = isObj ? function (cb) { return content.read.call(componet, cb); } : null, value = '';
         parentElement.appendChild(textNode);
-        subject.subscribe({
-            update: function (p) {
-                if (!once && readFn) {
-                    var newValue = readFn.call(componet);
-                    if (!_equals(value, newValue)) {
-                        value = newValue;
-                        textNode[('textContent' in textNode) ? 'textContent' : 'nodeValue'] = newValue;
-                    }
+        if (!once && readFn) {
+            subject.subscribe({
+                update: function (p) {
+                    readFn(function (newValue) {
+                        if (!_equals(value, newValue)) {
+                            value = newValue;
+                            _setTextNode(textNode, newValue);
+                        }
+                    });
                 }
+            });
+        }
+        else {
+            if (isObj) {
+                readFn(function (newValue) {
+                    _setTextNode(textNode, newValue);
+                });
             }
-        });
+            else
+                _setTextNode(textNode, content);
+        }
         return textNode;
     };
     Compile.setAttribute = function (element, name, subName, content, componet, subject, isComponet) {
@@ -980,15 +1136,16 @@ var Compile = (function () {
                         eventDef_2.addEventListener(element, item, writeFn_2, false);
                     });
                 }
-                attrDef_1.initAttribute && attrDef_1.initAttribute(element, name, isRead_2 ? content.read.call(componet) : '', subName, compileInfo);
+                attrDef_1.initAttribute && attrDef_1.initAttribute(element, name, '', subName, compileInfo);
                 subject.subscribe({
                     update: function (p) {
                         if (isRead_2) {
-                            newValue_2 = content.read.call(componet);
-                            if (!_equals(value_2, newValue_2)) {
-                                value_2 = newValue_2;
-                                attrDef_1.setAttribute(element, name, value_2, subName, compileInfo);
-                            }
+                            content.read.call(componet, function (newValue) {
+                                if (!_equals(value_2, newValue)) {
+                                    value_2 = newValue;
+                                    attrDef_1.setAttribute(element, name, value_2, subName, compileInfo);
+                                }
+                            });
                         }
                     },
                     remove: function (p) {
@@ -1042,19 +1199,29 @@ var Compile = (function () {
                 item.value = item.newValue;
                 item.content.write.call(componet, item.newValue);
             }
+        }, readFnAttr = function (item, cb) {
+            if (item.isObj)
+                item.content.read.call(componet, function (newValue) {
+                    item.newValue = newValue;
+                    cb(item);
+                });
+            else {
+                item.newValue = bind[item.attrName];
+                cb(item);
+            }
         }, update = function () {
             cmpxLib_1.CmpxLib.each(bindAttrs, function (item) {
                 if (item.isRead) {
-                    item.newValue = item.isObj ? item.content.read.call(componet)
-                        : bind[item.attrName];
-                    if (!_equals(item.value, item.newValue)) {
-                        isChange = true;
-                        item.value = item.newValue;
-                        bind[item.attrName] = item.value;
-                        item.attrDef.setAttribute(element, item.name, item.value, item.subName, compileInfo);
-                    }
-                    else
-                        writeFn(item);
+                    readFnAttr(item, function (item) {
+                        if (!_equals(item.value, item.newValue)) {
+                            isChange = true;
+                            item.value = item.newValue;
+                            bind[item.attrName] = item.value;
+                            item.attrDef.setAttribute(element, item.name, item.value, item.subName, compileInfo);
+                        }
+                        else
+                            writeFn(item);
+                    });
                 }
                 else if (item.isWrite)
                     writeFn(item);
@@ -1123,128 +1290,129 @@ var Compile = (function () {
                 }
             },
             update: function (p) {
-                var datas = dataFn.call(componet, componet, parentElement, subject);
-                if (!_equalArray(datas, value)) {
-                    var isArray = cmpxLib_1.CmpxLib.isArray(datas);
-                    //如果有数据
-                    if (datas) {
-                        //如果不是数组，转为一个数组
-                        isArray || (datas = [datas]);
-                        var count_1 = datas.length;
-                        if (syncFn) {
-                            //同步模式，同步性生成view
-                            var lastNode_1 = refNode;
-                            var rmList_1 = [], //要删除的数据
-                            dataList_1 = []; //合并后的数据
-                            (function (oldDatas, newDatas) {
-                                var hasList = [], nIdx;
-                                //计算要删除的数据和保留的数据
-                                cmpxLib_1.CmpxLib.each(oldDatas, function (item, index) {
-                                    //在新数据的位置
-                                    nIdx = syncFn.call(componet, item.data, count_1, index, datas);
-                                    if (nIdx >= 0) {
-                                        item.data = newDatas[nIdx];
-                                        item.newIndex = nIdx;
-                                        hasList.push(item);
-                                    }
-                                    else
-                                        rmList_1.push(item);
+                dataFn.call(componet, componet, parentElement, subject, function (datas) {
+                    if (!_equalArray(datas, value)) {
+                        var isArray = cmpxLib_1.CmpxLib.isArray(datas);
+                        //如果有数据
+                        if (datas) {
+                            //如果不是数组，转为一个数组
+                            isArray || (datas = [datas]);
+                            var count_1 = datas.length;
+                            if (syncFn) {
+                                //同步模式，同步性生成view
+                                var lastNode_1 = refNode;
+                                var rmList_1 = [], //要删除的数据
+                                dataList_1 = []; //合并后的数据
+                                (function (oldDatas, newDatas) {
+                                    var hasList = [], nIdx;
+                                    //计算要删除的数据和保留的数据
+                                    cmpxLib_1.CmpxLib.each(oldDatas, function (item, index) {
+                                        //在新数据的位置
+                                        nIdx = syncFn.call(componet, item.data, count_1, index, datas);
+                                        if (nIdx >= 0) {
+                                            item.data = newDatas[nIdx];
+                                            item.newIndex = nIdx;
+                                            hasList.push(item);
+                                        }
+                                        else
+                                            rmList_1.push(item);
+                                    });
+                                    //新数据与保留数据合并
+                                    cmpxLib_1.CmpxLib.each(newDatas, function (item, index) {
+                                        //在保留数据里的位置
+                                        nIdx = cmpxLib_1.CmpxLib.inArray(hasList, function (item) { return item.newIndex == index; });
+                                        if (nIdx >= 0) {
+                                            //保留数据，已有数据
+                                            dataList_1.push(hasList[nIdx]);
+                                        }
+                                        else {
+                                            //新数据, 没有fn属性
+                                            dataList_1.push({
+                                                index: index,
+                                                data: item
+                                            });
+                                        }
+                                    });
+                                })(syncDatas, datas);
+                                syncDatas = dataList_1;
+                                //删除多余节点(Node)
+                                cmpxLib_1.CmpxLib.each(rmList_1, function (item) {
+                                    item.nodes = _removeChildNodes(item.nodes);
+                                    item.subject.remove({
+                                        componet: componet
+                                    });
+                                    item.subject = item.nodes = null;
                                 });
-                                //新数据与保留数据合并
-                                cmpxLib_1.CmpxLib.each(newDatas, function (item, index) {
-                                    //在保留数据里的位置
-                                    nIdx = cmpxLib_1.CmpxLib.inArray(hasList, function (item) { return item.newIndex == index; });
-                                    if (nIdx >= 0) {
-                                        //保留数据，已有数据
-                                        dataList_1.push(hasList[nIdx]);
+                                var lastIndex_1 = -1;
+                                cmpxLib_1.CmpxLib.each(syncDatas, function (item, index) {
+                                    var fragm;
+                                    if (item.fn) {
+                                        //根据fn数据来确认保留数据
+                                        if (item.index < lastIndex_1) {
+                                            //根据原有index，如果大过上一个从中保留数据的原有index,移动原来的node
+                                            lastIndex_1 = item.index;
+                                            fragm = document.createDocumentFragment();
+                                            cmpxLib_1.CmpxLib.each(item.nodes, function (node) {
+                                                fragm.appendChild(node);
+                                            });
+                                            item.fn.call(componet, item.data, count_1, index);
+                                            item.subject.update({
+                                                componet: componet
+                                            });
+                                            _insertAfter(fragm, lastNode_1, _getParentElement(lastNode_1));
+                                        }
+                                        else {
+                                            //不用移动位置，只刷新数据
+                                            lastIndex_1 = item.index;
+                                            //重新处理for 变量
+                                            item.fn.call(componet, item.data, count_1, index);
+                                            item.subject.update({
+                                                componet: componet
+                                            });
+                                        }
+                                        //设置现在的index
+                                        item.index = index;
                                     }
                                     else {
-                                        //新数据, 没有fn属性
-                                        dataList_1.push({
-                                            index: index,
-                                            data: item
-                                        });
-                                    }
-                                });
-                            })(syncDatas, datas);
-                            syncDatas = dataList_1;
-                            //删除多余节点(Node)
-                            cmpxLib_1.CmpxLib.each(rmList_1, function (item) {
-                                item.nodes = _removeChildNodes(item.nodes);
-                                item.subject.remove({
-                                    componet: componet
-                                });
-                                item.subject = item.nodes = null;
-                            });
-                            var lastIndex_1 = -1;
-                            cmpxLib_1.CmpxLib.each(syncDatas, function (item, index) {
-                                var fragm;
-                                if (item.fn) {
-                                    //根据fn数据来确认保留数据
-                                    if (item.index < lastIndex_1) {
-                                        //根据原有index，如果大过上一个从中保留数据的原有index,移动原来的node
-                                        lastIndex_1 = item.index;
+                                        //如果不存在，新建
+                                        var st = item.subject = new compileSubject_1.CompileSubject(subject);
                                         fragm = document.createDocumentFragment();
-                                        cmpxLib_1.CmpxLib.each(item.nodes, function (node) {
-                                            fragm.appendChild(node);
-                                        });
-                                        item.fn.call(componet, item.data, count_1, index);
-                                        item.subject.update({
+                                        item.fn = eachFn.call(componet, item.data, count_1, index, componet, fragm, st);
+                                        item.nodes = cmpxLib_1.CmpxLib.toArray(fragm.childNodes);
+                                        st.update({
                                             componet: componet
                                         });
                                         _insertAfter(fragm, lastNode_1, _getParentElement(lastNode_1));
                                     }
-                                    else {
-                                        //不用移动位置，只刷新数据
-                                        lastIndex_1 = item.index;
-                                        //重新处理for 变量
-                                        item.fn.call(componet, item.data, count_1, index);
-                                        item.subject.update({
-                                            componet: componet
-                                        });
-                                    }
-                                    //设置现在的index
-                                    item.index = index;
-                                }
-                                else {
-                                    //如果不存在，新建
-                                    var st = item.subject = new compileSubject_1.CompileSubject(subject);
-                                    fragm = document.createDocumentFragment();
-                                    item.fn = eachFn.call(componet, item.data, count_1, index, componet, fragm, st);
-                                    item.nodes = cmpxLib_1.CmpxLib.toArray(fragm.childNodes);
-                                    st.update({
-                                        componet: componet
-                                    });
-                                    _insertAfter(fragm, lastNode_1, _getParentElement(lastNode_1));
-                                }
-                                //设置新的loasNode，用于插入位置
-                                lastNode_1 = item.nodes[item.nodes.length - 1] || lastNode_1;
-                            });
+                                    //设置新的loasNode，用于插入位置
+                                    lastNode_1 = item.nodes[item.nodes.length - 1] || lastNode_1;
+                                });
+                            }
+                            else {
+                                //普通模式, 一次性全部重新生成view
+                                var fragment_2 = document.createDocumentFragment();
+                                removeFn();
+                                newSubject && newSubject.remove({
+                                    componet: componet
+                                });
+                                newSubject = new compileSubject_1.CompileSubject(subject);
+                                cmpxLib_1.CmpxLib.each(datas, function (item, index) {
+                                    eachFn.call(componet, item, count_1, index, componet, fragment_2, newSubject);
+                                });
+                                childNodes = cmpxLib_1.CmpxLib.toArray(fragment_2.childNodes);
+                                newSubject.update({
+                                    componet: componet
+                                });
+                                _insertAfter(fragment_2, refNode, _getParentElement(refNode));
+                                fragment_2 = null;
+                            }
                         }
-                        else {
-                            //普通模式, 一次性全部重新生成view
-                            var fragment_2 = document.createDocumentFragment();
-                            removeFn();
-                            newSubject && newSubject.remove({
-                                componet: componet
-                            });
-                            newSubject = new compileSubject_1.CompileSubject(subject);
-                            cmpxLib_1.CmpxLib.each(datas, function (item, index) {
-                                eachFn.call(componet, item, count_1, index, componet, fragment_2, newSubject);
-                            });
-                            childNodes = cmpxLib_1.CmpxLib.toArray(fragment_2.childNodes);
-                            newSubject.update({
-                                componet: componet
-                            });
-                            _insertAfter(fragment_2, refNode, _getParentElement(refNode));
-                            fragment_2 = null;
-                        }
+                        else
+                            newSubject = null;
+                        //如果是数组，复制一份，如果不是直接备份，有用比较
+                        value = isArray ? datas.slice() : datas;
                     }
-                    else
-                        newSubject = null;
-                    //如果是数组，复制一份，如果不是直接备份，有用比较
-                    value = isArray ? datas.slice() : datas;
-                }
+                });
             },
             remove: function (p) {
                 removeFn();
@@ -1449,7 +1617,7 @@ var _buildCompileFn = function (tagInfos) {
     var outList = [], varNameList = [];
     _buildCompileFnContent(tagInfos, outList, varNameList, true);
     varNameList.length > 0 && outList.unshift('var ' + varNameList.join(',') + ';');
-    outList.unshift("var __tmplRender = Compile.tmplRender,\n        __setAttributeEx = Compile.setAttributeEx, __createElementEx = Compile.createElementEx,\n        __createTextNode = Compile.createTextNode, __setViewvar = Compile.setViewvar,\n        __forRender = Compile.forRender, __ifRender = Compile.ifRender,\n        __includeRender = Compile.includeRender, __updateRender = Compile.updateRender,\n        __componet = componet;");
+    outList.unshift("var __tmplRender = Compile.tmplRender,\n        __setAttributeEx = Compile.setAttributeEx, __createElementEx = Compile.createElementEx,\n        __createTextNode = Compile.createTextNode, __setViewvar = Compile.setViewvar,\n        __forRender = Compile.forRender, __ifRender = Compile.ifRender,\n        __includeRender = Compile.includeRender, __updateRender = Compile.updateRender,\n        __filter = Compile.filter, __mergerFilter = Compile.mergerFilter,\n        __componet = componet;");
     return new Function('CmpxLib', 'Compile', 'componet', 'element', 'subject', 'param', outList.join('\n'));
 }, _buildCpFnRetRmRegex = /\s*\=\s*\[\s*\]\s*$/, _escapeStringRegex = /([\"\\])/gm, _escapeBuildString = function (s) {
     return s ? s.replace(/([\"\\])/gm, '\\$1').replace(/\n/gm, '\\n').replace(/\r/gm, '\\r') : '';
@@ -1567,9 +1735,16 @@ var _buildCompileFn = function (tagInfos) {
             switch (tagName) {
                 case 'for':
                 case 'forx':
-                    var isForX = (tagName == 'forx'), extend = tag.attrs[0].extend, itemName = extend.item, fSync = extend.sync;
-                    outList.push('__forRender(function (componet, element, subject) {');
-                    outList.push('return ' + extend.datas + ';');
+                    var isForX = (tagName == 'forx'), extend = tag.attrs[0].extend, itemName = extend.item, fSync = extend.sync, filters = extend.filters;
+                    // filters
+                    // ftPos = _pushFilterCT(filterList, filter.filters, txt);
+                    outList.push('__forRender(function (componet, element, subject, cb) {');
+                    if (filters) {
+                        var filterList = [], ftPos = _pushFilterCT(filterList, filters, extend.datas);
+                        outList.push(filterList.join('\n') + '\n filter0(cb);');
+                    }
+                    else
+                        outList.push('cb(' + extend.datas + ');');
                     outList.push('}, function (' + itemName + ', $count, $index, componet, element, subject) {');
                     _buildCompileFnForVar(itemName, outList);
                     var forTmpl = extend.tmpl;

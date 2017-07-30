@@ -10,6 +10,23 @@ export interface IVMBindConfig {
  * @param config
  */
 export declare function VMBind(config: IVMBindConfig): (constructor: typeof Bind) => void;
+export declare class Filter {
+    result: any;
+    valuePre: any;
+    onFilter(value: any, param: any, cb: (result: any) => void, componet?: Componet, element?: HTMLElement): void;
+}
+export interface IMVFilterConfig {
+    name: string;
+    /**
+     * 无论原值是否有改变就过滤，默认true
+     */
+    alway?: boolean;
+}
+/**
+ * 注入组件配置信息
+ * @param config
+ */
+export declare function VMFilter(config: IMVFilterConfig): (constructor: typeof Filter) => void;
 /**
  * 引用模板事件
  * @param name 变量名称，未指定为属性名称
@@ -49,8 +66,10 @@ export declare class VMManager {
     static include(target: any, context: IVMContext, include: any[], parent?: any): any;
     private static getContext(target);
     private static getContextEx(target, type, name);
+    static getContextByType(target: any, type: string, name?: string): IVMContext;
     static getComponet(target: any, name?: string): IVMContext;
     static getBind(target: any, name?: string): IVMContext;
+    static getFilter(target: any, name?: string): IVMContext;
     /**
      * 配置
      * @param target
@@ -108,6 +127,8 @@ export declare class Compile {
      * 编译器启动，用于htmlDef配置后
      */
     static startUp(): void;
+    static filter(componet: Componet, element: HTMLElement, subject: CompileSubject, filters: any[], context: () => any): (cb: (result: any) => void) => void;
+    static mergerFilter(componet: Componet, filters: any[], cb: () => void): void;
     static loadTmplCfg(loadTmplFn: (url: string, cb: (tmpl: string | Function) => void) => void): void;
     static createElementEx(name: string, attrs: ICreateElementAttr[], componet: Componet, parentElement: HTMLElement, subject: CompileSubject, contextFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => void, content?: string, bindAttrs?: string): void;
     static createElement(name: string, attrs: ICreateElementAttr[], componet: Componet, parentElement: HTMLElement, subject: CompileSubject, contextFn: (componet: Componet, element: HTMLElement, subject: CompileSubject, isComponet: boolean, binds: any) => void, content?: string, bindAttrs?: string): void;
