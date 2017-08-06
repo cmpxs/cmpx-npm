@@ -2351,7 +2351,7 @@ var Compile = (function () {
                         preComponet_1 = refComponet;
                     }
                     else
-                        preSubject_1.update({
+                        preSubject_1 && preSubject_1.update({
                             componet: preComponet_1
                         });
                 },
