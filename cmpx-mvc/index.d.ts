@@ -112,8 +112,9 @@ export declare class RouterComponet extends Componet {
     reload(): void;
     private _path;
     private updateRender(callback);
-    onUpdateBefore(cb: any): void;
-    onInit(cb: any): void;
+    private _init;
+    private setRouter();
+    private change(path);
     onDispose(): void;
 }
 export declare class MvcBrowser extends Browser {

@@ -405,7 +405,9 @@ var _setRouter = function (name, router) {
 var RouterComponet = (function (_super) {
     __extends(RouterComponet, _super);
     function RouterComponet() {
-        return _super.call(this) || this;
+        var _this = _super.call(this) || this;
+        _this._init = false;
+        return _this;
     }
     RouterComponet.prototype.navigate = function (path, params) {
         this.params = params;
@@ -418,6 +420,7 @@ var RouterComponet = (function (_super) {
     };
     RouterComponet.prototype.updateRender = function (callback) {
         var _this = this;
+        this.setRouter();
         _getActionResult(this.name, this.path, this, function (view) {
             if (view) {
                 _this.render = _this.$render(view);
@@ -426,23 +429,16 @@ var RouterComponet = (function (_super) {
             callback();
         });
     };
-    RouterComponet.prototype.onUpdateBefore = function (cb) {
-        var _this = this;
-        if (this.path == this._path)
-            _super.prototype.onUpdateBefore.call(this, cb);
-        else {
-            this._path = this.path;
-            this.updateRender(function () {
-                _super.prototype.onUpdateBefore.call(_this, cb);
-            });
-        }
-    };
-    RouterComponet.prototype.onInit = function (cb) {
-        var _this = this;
+    RouterComponet.prototype.setRouter = function () {
+        if (this._init)
+            return;
+        this._init = true;
         this.name && _setRouter(this.name, this);
-        this._path = this.path;
+    };
+    RouterComponet.prototype.change = function (path) {
+        var _this = this;
         this.updateRender(function () {
-            _super.prototype.onInit.call(_this, cb);
+            _super.prototype.onChanged.call(_this);
         });
     };
     RouterComponet.prototype.onDispose = function () {
@@ -452,6 +448,9 @@ var RouterComponet = (function (_super) {
     __decorate([
         cmpx.VMAttr('name')
     ], RouterComponet.prototype, "name");
+    __decorate([
+        cmpx.VMWatch('this.path')
+    ], RouterComponet.prototype, "change");
     RouterComponet = __decorate([
         cmpx.VMComponet({
             name: 'router',
