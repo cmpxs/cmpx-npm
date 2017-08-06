@@ -9,23 +9,17 @@ var Componet = (function () {
         this.$isDisposed = false;
     }
     /**
-     * 更新View，View与Componet数据同步
+     * 更新(同步)视图，视图与数据同步
      * @param p 传入参数
      */
     Componet.prototype.$update = function (p) {
-        var _this = this;
         if (this.$isDisposed)
             return;
         this.clearUpdateTime();
-        this.onUpdateBefore(function () {
-            if (_this.$isDisposed)
-                return;
-            _this.$subject.update({
-                componet: _this,
-                param: p
-            });
-            _this.onUpdate(function () { }, p);
-        }, p);
+        this.$subject.update({
+            componet: this,
+            param: p
+        });
     };
     Componet.prototype.clearUpdateTime = function () {
         if (this.updateId) {
@@ -34,7 +28,7 @@ var Componet = (function () {
         }
     };
     /**
-     * 步异步更新View，View与Componet数据同步
+     * 步异步更新(同步)视图，视图与数据同步
      * @param p 传入参数
      */
     Componet.prototype.$updateAsync = function (callback, p) {
@@ -56,34 +50,25 @@ var Componet = (function () {
         return context;
     };
     /**
-     * 在解释View之前触发，一般准备数据用
-     * @param cb 处理完成后，通知继续处理
-     * @param p 传入的参数
+     * 在组件视图初始化后触发，此时视图还没插入到dom， 一次性事件
      */
-    Componet.prototype.onInit = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onInit = function () {
     };
     /**
-     * View所有东西已经处理完成时触发
-     * @param cb 处理完成后，通知继续处理
-     * @param p 传入参数
+     * 组件视图已经处理完成时触发， 一次性事件
      */
-    Componet.prototype.onReady = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onReady = function () {
+        this.$update();
     };
     /**
-     * $update前时触发
-     * @param cb 处理完成后，通知继续处理
+     * 每次数据与视图更新（同步）后触发
      */
-    Componet.prototype.onUpdateBefore = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onUpdate = function () {
     };
     /**
-     * $update后时触发
-     * @param cb 处理完成后，通知继续处理
+     * 每次数据与视图更新（同步）发生改变后触发
      */
-    Componet.prototype.onUpdate = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onChanged = function () {
     };
     /**
      * 在componet释放前触发

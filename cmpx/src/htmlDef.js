@@ -107,14 +107,22 @@ exports.DEFAULT_ATTR_PROP = {
     setAttribute: function (element, name, value, subName, complieInfo) {
         if (subName)
             element[name][subName] = name == 'value' ? cmpxLib_1.CmpxLib.toStr(value) : value;
-        else
-            element[name] = name == 'value' ? cmpxLib_1.CmpxLib.toStr(value) : value;
+        else {
+            if (name == 'style')
+                element.setAttribute(name, cmpxLib_1.CmpxLib.toStr(value));
+            else
+                element[name] = name == 'value' ? cmpxLib_1.CmpxLib.toStr(value) : value;
+        }
     },
     getAttribute: function (element, name, subName, complieInfo) {
         if (subName)
             return element[name][subName];
-        else
-            return element[name];
+        else {
+            if (name == 'style')
+                return element.getAttribute(name);
+            else
+                return element[name];
+        }
     }
 };
 var _htmlAttrDefConfig = {

@@ -54,15 +54,16 @@ export declare class VMManager {
      * @param target
      * @param name
      * @param context
+     * @param global 是否全局用，否则用于实体化个体上，默认true
      */
-    static setVM(target: any, name: string, context: any): any;
+    static setVM(target: any, name: string, context: any, global?: boolean): any;
     /**
      * 获取MV内容
      * @param target
      * @param name
      * @param defaultP 如果不存在时，此为默认内容
      */
-    static getVM(target: any, name: string, defaultP?: any): any;
+    static getVM(target: any, name: string, defaultP?: any, global?: boolean): any;
     static include(target: any, context: IVMContext, include: any[], parent?: any): any;
     private static getContext(target);
     private static getContextEx(target, type, name);

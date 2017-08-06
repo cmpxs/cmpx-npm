@@ -31,6 +31,15 @@ var _getParentElement = htmlDef_1.HtmlDef.getParentElement, _setAttribute = func
     single: false,
     //创建器
     createElement: _createElementRaw
+}), _createElementSvg = function (name, attrs, parent, content) {
+    var element = document.createElementNS('http://www.w3.org/2000/svg', name);
+    _setAttribute(element, attrs);
+    return element;
+}, _svrTag = new htmlDef_1.HtmlTagDef({
+    raw: false,
+    single: false,
+    //创建器
+    createElement: _createElementSvg
 });
 /**
  * htmlDef配置
@@ -38,9 +47,16 @@ var _getParentElement = htmlDef_1.HtmlDef.getParentElement, _setAttribute = func
 var _htmlConfig = function () {
     //扩展tag, 如果不支持请在这里扩展
     htmlDef_1.HtmlDef.extendHtmlTagDef({
-        //默认不支持svg, 请处理HtmlTagDef的createElement参数
-        'svg': htmlDef_1.DEFULE_TAG,
+        'svg': _svrTag,
+        'rect': _svrTag,
+        'circle': _svrTag,
+        'ellipse': _svrTag,
+        'line': _svrTag,
+        'polyline': _svrTag,
+        'polygon': _svrTag,
+        'path': _svrTag,
         //默认不支持math, 请处理HtmlTagDef的createElement参数
+        //document.createElementNS('http://www.w3.org/1998/Math/MathML', 'math');
         'math': htmlDef_1.DEFULE_TAG,
         'br': htmlDef_1.SINGLE_TAG,
         'style': _rawTag,

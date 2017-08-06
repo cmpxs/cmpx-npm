@@ -5,6 +5,7 @@ export interface ISubscribeEvent {
 export interface ISubscribeParam {
     init?: (p: ISubscribeEvent) => void;
     update?: (p: ISubscribeEvent) => void;
+    updateAfter?: (p: ISubscribeEvent) => void;
     ready?: (p: ISubscribeEvent) => void;
     remove?: (p: ISubscribeEvent) => void;
     detach?: (p: ISubscribeEvent) => void;
@@ -42,6 +43,8 @@ export declare class CompileSubject {
      */
     init(p: ISubscribeEvent): void;
     private updateList;
+    private updateAfterList;
+    private upateId;
     /**
      * 发送更新通知
      * @param p 发送事件参数

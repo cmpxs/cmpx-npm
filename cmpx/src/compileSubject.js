@@ -8,6 +8,7 @@ var CompileSubject = (function () {
          * 是否已经初始化
          */
         this.isInit = false;
+        this.upateId = 0;
         /**
          * 是否已分离
          */
@@ -46,6 +47,7 @@ var CompileSubject = (function () {
     CompileSubject.prototype.subscribe = function (p) {
         if (!this.isRemove) {
             p.update && this.subscribeIn('update', p);
+            p.updateAfter && this.subscribeIn('updateAfter', p);
             p.remove && this.subscribeIn('remove', p);
             p.detach && this.subscribeIn('detach', p);
             if (this.ready)
@@ -73,6 +75,7 @@ var CompileSubject = (function () {
     CompileSubject.prototype.unSubscribe = function (p) {
         if (!this.isRemove) {
             p.update && this.unSubscribeIn('update', p);
+            p.updateAfter && this.unSubscribeIn('updateAfter', p);
             p.ready && this.unSubscribeIn('ready', p);
             p.detach && this.unSubscribeIn('detach', p);
             p.remove && this.unSubscribeIn('remove', p);
@@ -107,9 +110,20 @@ var CompileSubject = (function () {
     CompileSubject.prototype.update = function (p) {
         if (this.isRemove || this.isDetach)
             return;
+        this.upateId++;
+        if (this.upateId == 99999)
+            this.upateId = 0;
+        var updateId = this.upateId;
         cmpxLib_1.CmpxLib.each(this.updateList, function (fn) {
+            if (this.upateId != updateId)
+                return false;
             fn && fn(p);
-        });
+        }, this);
+        cmpxLib_1.CmpxLib.each(this.updateAfterList, function (fn) {
+            if (this.upateId != updateId)
+                return false;
+            fn && fn(p);
+        }, this);
     };
     /**
      * 发送分离通知，不删除

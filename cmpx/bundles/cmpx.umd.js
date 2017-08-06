@@ -333,14 +333,22 @@ var DEFAULT_ATTR_PROP = {
     setAttribute: function (element, name, value, subName, complieInfo) {
         if (subName)
             element[name][subName] = name == 'value' ? CmpxLib.toStr(value) : value;
-        else
-            element[name] = name == 'value' ? CmpxLib.toStr(value) : value;
+        else {
+            if (name == 'style')
+                element.setAttribute(name, CmpxLib.toStr(value));
+            else
+                element[name] = name == 'value' ? CmpxLib.toStr(value) : value;
+        }
     },
     getAttribute: function (element, name, subName, complieInfo) {
         if (subName)
             return element[name][subName];
-        else
-            return element[name];
+        else {
+            if (name == 'style')
+                return element.getAttribute(name);
+            else
+                return element[name];
+        }
     }
 };
 var _htmlAttrDefConfig = {
@@ -457,6 +465,7 @@ var CompileSubject = (function () {
          * 是否已经初始化
          */
         this.isInit = false;
+        this.upateId = 0;
         /**
          * 是否已分离
          */
@@ -495,6 +504,7 @@ var CompileSubject = (function () {
     CompileSubject.prototype.subscribe = function (p) {
         if (!this.isRemove) {
             p.update && this.subscribeIn('update', p);
+            p.updateAfter && this.subscribeIn('updateAfter', p);
             p.remove && this.subscribeIn('remove', p);
             p.detach && this.subscribeIn('detach', p);
             if (this.ready)
@@ -522,6 +532,7 @@ var CompileSubject = (function () {
     CompileSubject.prototype.unSubscribe = function (p) {
         if (!this.isRemove) {
             p.update && this.unSubscribeIn('update', p);
+            p.updateAfter && this.unSubscribeIn('updateAfter', p);
             p.ready && this.unSubscribeIn('ready', p);
             p.detach && this.unSubscribeIn('detach', p);
             p.remove && this.unSubscribeIn('remove', p);
@@ -556,9 +567,20 @@ var CompileSubject = (function () {
     CompileSubject.prototype.update = function (p) {
         if (this.isRemove || this.isDetach)
             return;
+        this.upateId++;
+        if (this.upateId == 99999)
+            this.upateId = 0;
+        var updateId = this.upateId;
         CmpxLib.each(this.updateList, function (fn) {
+            if (this.upateId != updateId)
+                return false;
             fn && fn(p);
-        });
+        }, this);
+        CmpxLib.each(this.updateAfterList, function (fn) {
+            if (this.upateId != updateId)
+                return false;
+            fn && fn(p);
+        }, this);
     };
     /**
      * 发送分离通知，不删除
@@ -616,23 +638,17 @@ var Componet = (function () {
         this.$isDisposed = false;
     }
     /**
-     * 更新View，View与Componet数据同步
+     * 更新(同步)视图，视图与数据同步
      * @param p 传入参数
      */
     Componet.prototype.$update = function (p) {
-        var _this = this;
         if (this.$isDisposed)
             return;
         this.clearUpdateTime();
-        this.onUpdateBefore(function () {
-            if (_this.$isDisposed)
-                return;
-            _this.$subject.update({
-                componet: _this,
-                param: p
-            });
-            _this.onUpdate(function () { }, p);
-        }, p);
+        this.$subject.update({
+            componet: this,
+            param: p
+        });
     };
     Componet.prototype.clearUpdateTime = function () {
         if (this.updateId) {
@@ -641,7 +657,7 @@ var Componet = (function () {
         }
     };
     /**
-     * 步异步更新View，View与Componet数据同步
+     * 步异步更新(同步)视图，视图与数据同步
      * @param p 传入参数
      */
     Componet.prototype.$updateAsync = function (callback, p) {
@@ -663,34 +679,25 @@ var Componet = (function () {
         return context;
     };
     /**
-     * 在解释View之前触发，一般准备数据用
-     * @param cb 处理完成后，通知继续处理
-     * @param p 传入的参数
+     * 在组件视图初始化后触发，此时视图还没插入到dom， 一次性事件
      */
-    Componet.prototype.onInit = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onInit = function () {
     };
     /**
-     * View所有东西已经处理完成时触发
-     * @param cb 处理完成后，通知继续处理
-     * @param p 传入参数
+     * 组件视图已经处理完成时触发， 一次性事件
      */
-    Componet.prototype.onReady = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onReady = function () {
+        this.$update();
     };
     /**
-     * $update前时触发
-     * @param cb 处理完成后，通知继续处理
+     * 每次数据与视图更新（同步）后触发
      */
-    Componet.prototype.onUpdateBefore = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onUpdate = function () {
     };
     /**
-     * $update后时触发
-     * @param cb 处理完成后，通知继续处理
+     * 每次数据与视图更新（同步）发生改变后触发
      */
-    Componet.prototype.onUpdate = function (cb, p) {
-        cb && cb();
+    Componet.prototype.onChanged = function () {
     };
     /**
      * 在componet释放前触发
@@ -1166,6 +1173,7 @@ var _getFilterInfos = function (value) {
 var _vmName = "__vm__";
 var _vmConfigName = 'config';
 var _vmContextName = 'context';
+var _vmNameCT = "__vmCT__";
 var VMManager = (function () {
     function VMManager() {
     }
@@ -1174,9 +1182,10 @@ var VMManager = (function () {
      * @param target
      * @param name
      * @param context
+     * @param global 是否全局用，否则用于实体化个体上，默认true
      */
-    VMManager.setVM = function (target, name, context) {
-        var vm = target[_vmName] || (target[_vmName] = {});
+    VMManager.setVM = function (target, name, context, global) {
+        var vmName = global === false ? _vmNameCT : _vmName, vm = target[vmName] || (target[vmName] = {});
         return vm[name] = context;
     };
     /**
@@ -1185,8 +1194,8 @@ var VMManager = (function () {
      * @param name
      * @param defaultP 如果不存在时，此为默认内容
      */
-    VMManager.getVM = function (target, name, defaultP) {
-        var vm = target[_vmName], re = vm && vm[name];
+    VMManager.getVM = function (target, name, defaultP, global) {
+        var vm = target[global === false ? _vmNameCT : _vmName], re = vm && vm[name];
         if (!re && defaultP) {
             re = this.setVM(target, name, defaultP);
         }
@@ -1244,26 +1253,17 @@ var VMManager = (function () {
     VMManager.getConfig = function (target) {
         return this.getVM(target, _vmConfigName);
     };
-    // private static getContext(target:any): any{
-    //     return this.getVM(target, _vmContextName);
-    // }
-    // /**
-    //  * 其它
-    //  * @param target 
-    //  * @param name 
-    //  * @param context 
-    //  */
-    // static setOther(target:any, name:string, context:any){
-    //     return this.setVM(target, _vmOtherName, context);
-    // }
-    // static getOter(target:any, name:string): any{
-    //     return this.getVM(target, _vmOtherName);
-    // }
     VMManager.getTarget = function (p, t) {
         return (p instanceof t ? p : p.prototype);
     };
     return VMManager;
 }());
+var _setChange = function (target, change) {
+    VMManager.setVM(target, 'change', change, false);
+};
+var _getChange = function (target) {
+    return VMManager.getVM(target, 'change', null, false);
+};
 var _readyRd = false;
 var _renderPR = [];
 /**
@@ -1430,8 +1430,7 @@ var _removeChildNodes = function (childNodes) {
 };
 var _detachElement = function (nodes) {
     if (nodes && nodes.length > 0) {
-        var //pNode:Node = _getParentElement(nodes[0]),
-        fragment_1 = document.createDocumentFragment();
+        var fragment_1 = document.createDocumentFragment();
         CmpxLib.each(nodes, function (item) {
             fragment_1.appendChild(item);
         });
@@ -1511,6 +1510,15 @@ var CompileRender = (function () {
             update: function () {
                 watchFn && watchFn();
             },
+            updateAfter: function () {
+                if (isNewComponet) {
+                    if (_getChange(componet)) {
+                        _setChange(componet, false);
+                        componet.onChanged();
+                    }
+                    componet.onUpdate();
+                }
+            },
             remove: function (p) {
                 var rmFn = function () {
                     var vv = _getViewvarDef(componet);
@@ -1569,6 +1577,7 @@ var CompileRender = (function () {
             newSubject.update({
                 componet: componet
             });
+            isNewComponet && componet.onInit();
             readyFn();
         }, readyFn = function () {
             _insertAfter(fragment, refNode, _getParentElement(refNode));
@@ -1581,20 +1590,14 @@ var CompileRender = (function () {
                     componet: componet
                 });
             };
-            if (isNewComponet)
-                componet.onReady(function () {
-                    readyEnd();
-                }, null);
+            if (isNewComponet) {
+                readyEnd();
+                componet.onReady();
+            }
             else
                 readyEnd();
         };
-        if (isNewComponet) {
-            componet.onInit(function (err) {
-                initFn();
-            }, null);
-        }
-        else
-            initFn();
+        initFn();
         return { newSubject: newSubject, refComponet: componet };
     };
     return CompileRender;
@@ -1629,6 +1632,7 @@ var Compile = (function () {
         });
         var count = filterList.length, result, filterResult = function (filter, alway, p, index, cb) {
             if (alway || !_equals(filter.result, result)) {
+                _setChange(componet, true);
                 filter.result = result;
                 filter.onFilter(result, p, function (r) {
                     result = filter.valuePre = r;
@@ -1786,17 +1790,19 @@ var Compile = (function () {
                 var value_1, newValue_1, isWrite_1 = !!content.write, isRead_1 = !!content.read, writeFn_1 = function (p) {
                     newValue_1 = componet[name];
                     if (value_1 != newValue_1) {
+                        _setChange(parent, true);
                         value_1 = newValue_1;
                         content.write.call(parent, newValue_1);
-                        parent.$updateAsync();
+                        parent.$update();
                     }
                 }, updateFn = function (p) {
                     if (isRead_1) {
                         content.read.call(parent, function (newValue) {
                             if (!_equals(value_1, newValue)) {
+                                _setChange(componet, true);
                                 value_1 = newValue;
                                 componet[name] = value_1;
-                                componet.$updateAsync();
+                                componet.$update();
                             }
                             else if (isWrite_1) {
                                 writeFn_1(p);
@@ -1830,6 +1836,7 @@ var Compile = (function () {
                 update: function (p) {
                     readFn(function (newValue) {
                         if (!_equals(value, newValue)) {
+                            _setChange(componet, true);
                             value = newValue;
                             _setTextNode(textNode, newValue);
                         }
@@ -1873,9 +1880,10 @@ var Compile = (function () {
                 var value_2 = '', newValue_2, isWrite_2 = !!content.write, isRead_2 = !!content.read, writeFn_2 = function () {
                     newValue_2 = attrDef_1.getAttribute(element, name, '', compileInfo);
                     if (!_equals(value_2, newValue_2)) {
+                        _setChange(componet, true);
                         value_2 = newValue_2;
                         content.write.call(componet, newValue_2);
-                        componet.$updateAsync();
+                        componet.$update();
                     }
                 };
                 var attrDef_1 = HtmlDef.getHtmlAttrDef(name), writeEvent_1 = attrDef_1.writeEvent || ['change', 'click'];
@@ -1891,6 +1899,7 @@ var Compile = (function () {
                         if (isRead_2) {
                             content.read.call(componet, function (newValue) {
                                 if (!_equals(value_2, newValue)) {
+                                    _setChange(componet, true);
                                     value_2 = newValue;
                                     attrDef_1.setAttribute(element, name, value_2, subName, compileInfo);
                                 }
@@ -1980,6 +1989,7 @@ var Compile = (function () {
             update();
             isChange && bind.onChanged();
             if (isChange) {
+                _setChange(componet, true);
                 doUpdate();
             }
         };
@@ -2041,6 +2051,7 @@ var Compile = (function () {
             update: function (p) {
                 dataFn.call(componet, componet, parentElement, subject, function (datas) {
                     if (!_equalArray(datas, value)) {
+                        _setChange(componet, true);
                         var isArray = CmpxLib.isArray(datas);
                         //如果有数据
                         if (datas) {
@@ -2618,15 +2629,33 @@ var _rawTag = new HtmlTagDef({
     //创建器
     createElement: _createElementRaw
 });
+var _createElementSvg = function (name, attrs, parent, content) {
+    var element = document.createElementNS('http://www.w3.org/2000/svg', name);
+    _setAttribute(element, attrs);
+    return element;
+};
+var _svrTag = new HtmlTagDef({
+    raw: false,
+    single: false,
+    //创建器
+    createElement: _createElementSvg
+});
 /**
  * htmlDef配置
  */
 var _htmlConfig = function () {
     //扩展tag, 如果不支持请在这里扩展
     HtmlDef.extendHtmlTagDef({
-        //默认不支持svg, 请处理HtmlTagDef的createElement参数
-        'svg': DEFULE_TAG,
+        'svg': _svrTag,
+        'rect': _svrTag,
+        'circle': _svrTag,
+        'ellipse': _svrTag,
+        'line': _svrTag,
+        'polyline': _svrTag,
+        'polygon': _svrTag,
+        'path': _svrTag,
         //默认不支持math, 请处理HtmlTagDef的createElement参数
+        //document.createElementNS('http://www.w3.org/1998/Math/MathML', 'math');
         'math': DEFULE_TAG,
         'br': SINGLE_TAG,
         'style': _rawTag,

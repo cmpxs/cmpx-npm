@@ -6,14 +6,14 @@ export declare class Componet {
     readonly $children: Array<Componet>;
     readonly $parentElement: HTMLElement;
     /**
-     * 更新View，View与Componet数据同步
+     * 更新(同步)视图，视图与数据同步
      * @param p 传入参数
      */
     $update(p?: any): void;
     private updateId;
     private clearUpdateTime();
     /**
-     * 步异步更新View，View与Componet数据同步
+     * 步异步更新(同步)视图，视图与数据同步
      * @param p 传入参数
      */
     $updateAsync(callback?: () => void, p?: any): void;
@@ -24,27 +24,21 @@ export declare class Componet {
      */
     $render(context: string | Function | Componet): any;
     /**
-     * 在解释View之前触发，一般准备数据用
-     * @param cb 处理完成后，通知继续处理
-     * @param p 传入的参数
+     * 在组件视图初始化后触发，此时视图还没插入到dom， 一次性事件
      */
-    onInit(cb: (err?: any) => void, p?: any): void;
+    onInit(): void;
     /**
-     * View所有东西已经处理完成时触发
-     * @param cb 处理完成后，通知继续处理
-     * @param p 传入参数
+     * 组件视图已经处理完成时触发， 一次性事件
      */
-    onReady(cb: (err?: any) => void, p?: any): void;
+    onReady(): void;
     /**
-     * $update前时触发
-     * @param cb 处理完成后，通知继续处理
+     * 每次数据与视图更新（同步）后触发
      */
-    onUpdateBefore(cb: (err?: any) => void, p?: any): void;
+    onUpdate(): void;
     /**
-     * $update后时触发
-     * @param cb 处理完成后，通知继续处理
+     * 每次数据与视图更新（同步）发生改变后触发
      */
-    onUpdate(cb: (err?: any) => void, p?: any): void;
+    onChanged(): void;
     /**
      * 是否已经释放
      */

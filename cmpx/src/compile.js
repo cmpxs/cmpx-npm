@@ -430,7 +430,7 @@ _getBind = function (value, split) {
     });
     return { value: cmpxLib_1.CmpxLib.trim(value), filters: filters, has: filters.length > 0 };
 };
-var _vmName = "__vm__", _vmConfigName = 'config', _vmContextName = 'context', _vmOtherName = 'other';
+var _vmName = "__vm__", _vmConfigName = 'config', _vmContextName = 'context', _vmNameCT = "__vmCT__";
 var VMManager = (function () {
     function VMManager() {
     }
@@ -439,9 +439,10 @@ var VMManager = (function () {
      * @param target
      * @param name
      * @param context
+     * @param global 是否全局用，否则用于实体化个体上，默认true
      */
-    VMManager.setVM = function (target, name, context) {
-        var vm = target[_vmName] || (target[_vmName] = {});
+    VMManager.setVM = function (target, name, context, global) {
+        var vmName = global === false ? _vmNameCT : _vmName, vm = target[vmName] || (target[vmName] = {});
         return vm[name] = context;
     };
     /**
@@ -450,8 +451,8 @@ var VMManager = (function () {
      * @param name
      * @param defaultP 如果不存在时，此为默认内容
      */
-    VMManager.getVM = function (target, name, defaultP) {
-        var vm = target[_vmName], re = vm && vm[name];
+    VMManager.getVM = function (target, name, defaultP, global) {
+        var vm = target[global === false ? _vmNameCT : _vmName], re = vm && vm[name];
         if (!re && defaultP) {
             re = this.setVM(target, name, defaultP);
         }
@@ -509,27 +510,17 @@ var VMManager = (function () {
     VMManager.getConfig = function (target) {
         return this.getVM(target, _vmConfigName);
     };
-    // private static getContext(target:any): any{
-    //     return this.getVM(target, _vmContextName);
-    // }
-    // /**
-    //  * 其它
-    //  * @param target 
-    //  * @param name 
-    //  * @param context 
-    //  */
-    // static setOther(target:any, name:string, context:any){
-    //     return this.setVM(target, _vmOtherName, context);
-    // }
-    // static getOter(target:any, name:string): any{
-    //     return this.getVM(target, _vmOtherName);
-    // }
     VMManager.getTarget = function (p, t) {
         return (p instanceof t ? p : p.prototype);
     };
     return VMManager;
 }());
 exports.VMManager = VMManager;
+var _setChange = function (target, change) {
+    VMManager.setVM(target, 'change', change, false);
+}, _getChange = function (target) {
+    return VMManager.getVM(target, 'change', null, false);
+};
 var _readyRd = false, _renderPR = [];
 /**
  * 注入组件配置信息
@@ -682,8 +673,7 @@ var _tmplName = '__tmpl__', _getComponetTmpl = function (componet, id) {
     return null;
 }, _detachElement = function (nodes) {
     if (nodes && nodes.length > 0) {
-        var //pNode:Node = _getParentElement(nodes[0]),
-        fragment_1 = document.createDocumentFragment();
+        var fragment_1 = document.createDocumentFragment();
         cmpxLib_1.CmpxLib.each(nodes, function (item) {
             fragment_1.appendChild(item);
         });
@@ -761,6 +751,15 @@ var CompileRender = (function () {
             update: function () {
                 watchFn && watchFn();
             },
+            updateAfter: function () {
+                if (isNewComponet) {
+                    if (_getChange(componet)) {
+                        _setChange(componet, false);
+                        componet.onChanged();
+                    }
+                    componet.onUpdate();
+                }
+            },
             remove: function (p) {
                 var rmFn = function () {
                     var vv = _getViewvarDef(componet);
@@ -819,6 +818,7 @@ var CompileRender = (function () {
             newSubject.update({
                 componet: componet
             });
+            isNewComponet && componet.onInit();
             readyFn();
         }, readyFn = function () {
             _insertAfter(fragment, refNode, _getParentElement(refNode));
@@ -831,20 +831,14 @@ var CompileRender = (function () {
                     componet: componet
                 });
             };
-            if (isNewComponet)
-                componet.onReady(function () {
-                    readyEnd();
-                }, null);
+            if (isNewComponet) {
+                readyEnd();
+                componet.onReady();
+            }
             else
                 readyEnd();
         };
-        if (isNewComponet) {
-            componet.onInit(function (err) {
-                initFn();
-            }, null);
-        }
-        else
-            initFn();
+        initFn();
         return { newSubject: newSubject, refComponet: componet };
     };
     return CompileRender;
@@ -880,6 +874,7 @@ var Compile = (function () {
         });
         var count = filterList.length, result, filterResult = function (filter, alway, p, index, cb) {
             if (alway || !_equals(filter.result, result)) {
+                _setChange(componet, true);
                 filter.result = result;
                 filter.onFilter(result, p, function (r) {
                     result = filter.valuePre = r;
@@ -1037,17 +1032,19 @@ var Compile = (function () {
                 var value_1, newValue_1, isWrite_1 = !!content.write, isRead_1 = !!content.read, writeFn_1 = function (p) {
                     newValue_1 = componet[name];
                     if (value_1 != newValue_1) {
+                        _setChange(parent, true);
                         value_1 = newValue_1;
                         content.write.call(parent, newValue_1);
-                        parent.$updateAsync();
+                        parent.$update();
                     }
                 }, updateFn = function (p) {
                     if (isRead_1) {
                         content.read.call(parent, function (newValue) {
                             if (!_equals(value_1, newValue)) {
+                                _setChange(componet, true);
                                 value_1 = newValue;
                                 componet[name] = value_1;
-                                componet.$updateAsync();
+                                componet.$update();
                             }
                             else if (isWrite_1) {
                                 writeFn_1(p);
@@ -1081,6 +1078,7 @@ var Compile = (function () {
                 update: function (p) {
                     readFn(function (newValue) {
                         if (!_equals(value, newValue)) {
+                            _setChange(componet, true);
                             value = newValue;
                             _setTextNode(textNode, newValue);
                         }
@@ -1124,9 +1122,10 @@ var Compile = (function () {
                 var value_2 = '', newValue_2, isWrite_2 = !!content.write, isRead_2 = !!content.read, writeFn_2 = function () {
                     newValue_2 = attrDef_1.getAttribute(element, name, '', compileInfo);
                     if (!_equals(value_2, newValue_2)) {
+                        _setChange(componet, true);
                         value_2 = newValue_2;
                         content.write.call(componet, newValue_2);
-                        componet.$updateAsync();
+                        componet.$update();
                     }
                 };
                 var attrDef_1 = htmlDef_1.HtmlDef.getHtmlAttrDef(name), writeEvent_1 = attrDef_1.writeEvent || ['change', 'click'];
@@ -1142,6 +1141,7 @@ var Compile = (function () {
                         if (isRead_2) {
                             content.read.call(componet, function (newValue) {
                                 if (!_equals(value_2, newValue)) {
+                                    _setChange(componet, true);
                                     value_2 = newValue;
                                     attrDef_1.setAttribute(element, name, value_2, subName, compileInfo);
                                 }
@@ -1231,6 +1231,7 @@ var Compile = (function () {
             update();
             isChange && bind.onChanged();
             if (isChange) {
+                _setChange(componet, true);
                 doUpdate();
             }
         };
@@ -1292,6 +1293,7 @@ var Compile = (function () {
             update: function (p) {
                 dataFn.call(componet, componet, parentElement, subject, function (datas) {
                     if (!_equalArray(datas, value)) {
+                        _setChange(componet, true);
                         var isArray = cmpxLib_1.CmpxLib.isArray(datas);
                         //如果有数据
                         if (datas) {
