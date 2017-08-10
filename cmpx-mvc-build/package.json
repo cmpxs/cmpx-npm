@@ -1,6 +1,6 @@
 {
   "name": "cmpx-mvc-build",
-  "version": "1.0.0-deta2",
+  "version": "1.0.0-deta3",
   "description": "cmpx-mvc-build",
   "main": "index.js",
   "scripts": {
