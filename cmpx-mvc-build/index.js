@@ -7,11 +7,11 @@ var path = require('path'),
 var cmpx = require('cmpx'),
     CompileRender = cmpx.CompileRender;
 
-var _tmplRegex = /\s*@VMView\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmpl\s*\:\s*(([`])[^`]*?\2)(?:\n|\r|.)*?\}(?:\n|\r|\s)*\)(?:\n|\r|\s)*(?:\w+\s+)*class(?:\n|\r|\s)+(?:\w+\s+)+extends(?:\n|\r|\s)+(?:\w+\s*)+/gmi,
-    _tmplRegex2 = /\s*@VMView\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmpl\s*\:\s*((["']).*\2)(?:\n|\r|.)*?\}(?:\n|\r|\s)*\)(?:\n|\r|\s)*(?:\w+\s+)*class(?:\n|\r|\s)+(?:\w+\s+)+extends(?:\n|\r|\s)+(?:\w+\s*)+/gmi,
-    _tmplUrlRegex = /\s*@VMView\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?tmplUrl\s*\:\s*((["'`]).*\2)(?:\n|\r|.)*?\}(?:\n|\r|\s)*\)(?:\n|\r|\s)*(?:\w+\s+)*class(?:\n|\r|\s)+(?:\w+\s+)+extends(?:\n|\r|\s)+(?:\w+\s*)+/gmi,
-    _styleUrlRegex = /\s*@VMView\s*\((?:\n|\r|\s)*\{(?:\n|\r|.)*?styleUrl\s*\:\s*((["'`]).*\2)(?:\n|\r|.)*?\}(?:\n|\r|\s)*\)(?:\n|\r|\s)*(?:\w+\s+)*class(?:\n|\r|\s)+(?:\w+\s+)+extends(?:\n|\r|\s)+(?:\w+\s*)+/gmi,
-    _webPackCtrlRegex = /new +WebpackLoaderContorllerResult\s*\(\s*(['"`])([^'"`]*)\1[^,]*\,[^'"`]*(['"`])([^'"`]*)\3\)/gmi;
+var _vmRegex = /(\s*@VMView\s*\((?:\n|\r|\s)*\{)((?:\n|\r|.)*?)(\}(?:\n|\r|\s)*\)(?:\n|\r|\s)*(?:\w+\s+)*class(?:\n|\r|\s)+(?:\w+\s+)+extends(?:\n|\r|\s)+(?:\w+\s*)+)/gmi,
+    _vmContentRegex = /(^(?:\n|\r|\s)*|\,(?:\n|\r|\s)*)(tmplUrl|tmpl|styleUrl)\s*\:\s*([`"'])((?:\n|\r|.)*)\3((?:\n|\r|\s)*$|(?:\n|\r|\s)*\,)/mgi,
+    _vmStrGGRegex = /\\(.)/mg;
+  
+var _webPackCtrlRegex = /new +WebpackLoaderContorllerResult\s*\(\s*(['"`])([^'"`]*)\1[^,]*\,[^'"`]*(['"`])([^'"`]*)\3\)/gmi;
 
 var _buildRegex = /##%(tmpl|tmplUrl|styleUrl|\$render)%\$\-\[([^\]]*?)\]/gmi;
 
@@ -36,38 +36,36 @@ var _buildTmpl = function (tmpl) {
             })`;
         });
     }
-    if (_tmplRegex.test(source)) {
-        source = source.replace(_tmplRegex, function (find, tmpl, split) {
-            find = find.replace(tmpl, _escapeTmpl('tmpl', tmpl.substr(1, tmpl.length - 2)));
-            return find;
+    if (_vmRegex.test(source)) {
+        source = source.replace(_vmRegex, function (find, begin, vmContent, end) {
+          vmContent = vmContent.replace(_vmContentRegex, function (find, begin, name, split, content, end) {
+            let buildContent = '', filePath, fileContent;
+            switch (name) {
+              case 'tmpl':
+                content = content.replace(_vmStrGGRegex, '$1');
+                buildContent = _buildTmpl(content);
+                break;
+              case 'tmplUrl':
+                filePath = content;
+                filePath = path.join(path.dirname(resourcePath), filePath);
+                files.push(filePath);
+                fileContent = fs.readFileSync(filePath, encoding);
+                buildContent = _buildTmpl(fileContent);
+                break;
+              case 'styleUrl':
+                filePath = content;
+                filePath = path.join(path.dirname(resourcePath), filePath);
+                files.push(filePath);
+                fileContent = fs.readFileSync(filePath, encoding);
+                buildContent = 'function() { return `' + fileContent + '`; }';
+                break;
+            }
+            return [begin, name, ': ', buildContent, end].join('');
+          });
+          return [begin, vmContent, end].join('');
         });
-    }
-    if (_tmplRegex2.test(source)) {
-        source = source.replace(_tmplRegex2, function (find, tmpl, split) {
-            find = find.replace(tmpl, _escapeTmpl('tmpl', tmpl.substr(1, tmpl.length - 2)));
-            return find;
-        });
-    }
-    if (_tmplUrlRegex.test(source)) {
-        source = source.replace(_tmplUrlRegex, (find, tmpl, split) => {
-            let filePath = tmpl.substr(1, tmpl.length - 2);
-            filePath = path.join(path.dirname(resourcePath), filePath);
-            files.push(filePath);
-            let fileContent = fs.readFileSync(filePath, encoding);
-            find = find.replace(tmpl, _escapeTmpl('tmplUrl', fileContent));
-            return find;
-        });
-    }
-    if (_styleUrlRegex.test(source)) {
-        source = source.replace(_styleUrlRegex, (find, tmpl, split) => {
-            let filePath = tmpl.substr(1, tmpl.length - 2);
-            filePath = path.join(path.dirname(resourcePath), filePath);
-            files.push(filePath);
-            let fileContent = fs.readFileSync(filePath, encoding);
-            find = find.replace(tmpl, _escapeTmpl('styleUrl', fileContent));
-            return find;
-        });
-    }
+      }
+
     return { vmSource: source, vmFiles: files };
 
 }, _buildTypeScript = function (resourcePath, source, encoding) {
@@ -76,18 +74,6 @@ var _buildTmpl = function (tmpl) {
     let { vmSource, vmFiles } = _escapeVM(resourcePath, content, encoding);
     vmFiles = files.concat(vmFiles);
 
-    if (_buildRegex.test(vmSource)) {
-        vmSource = vmSource.replace(_buildRegex, function (find, type, content) {
-            content = decodeURIComponent(content);
-            switch (type) {
-                case 'tmpl':
-                case 'tmplUrl':
-                    return _buildTmpl(content);
-                case 'styleUrl':
-                    return 'function() { return `' + content + '`; }'
-            }
-        });
-    }
 
     return { content: vmSource, files: vmFiles };
 };
