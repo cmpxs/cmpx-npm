@@ -1,5 +1,15 @@
 import { Componet, VMComponet, Browser, Bind } from 'cmpx';
 export * from 'cmpx';
+declare global  {
+    /**
+     * 声明按需加
+     */
+    const require: {
+        <T>(path: string): T;
+        (paths: string[], callback: (...modules: any[]) => void): void;
+        ensure: (paths: string[], callback: (require: <T>(path: string) => T) => void, chunckName?: string) => void;
+    };
+}
 export declare abstract class ActionResult {
     readonly $location: ActionLocation;
     abstract onLayout(cb: any): void;
@@ -79,6 +89,7 @@ export declare class ActionLocation {
 }
 export declare let VMView: typeof VMComponet;
 export declare class View extends Componet {
+    static RootView: View;
     readonly $location: ActionLocation;
     readonly $parentView: View;
     readonly $controller: Controller;
@@ -111,7 +122,7 @@ export declare class RouterComponet extends Componet {
     navigate(path: string, params?: any[]): void;
     reload(): void;
     private _path;
-    private updateRender(callback);
+    private updateRender();
     private _init;
     private setRouter();
     private change(path);

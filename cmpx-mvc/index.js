@@ -227,7 +227,7 @@ var ActionLocation = (function () {
 cmpx.VMManager.parent = function (target, context) {
     switch (context.type) {
         case "Componet":
-            return target.$controller;
+            return target.$controller || _rootController;
         case "Controller":
             return target.$parent;
     }
@@ -418,15 +418,14 @@ var RouterComponet = (function (_super) {
         this._path += '_';
         this.navigate(this.path);
     };
-    RouterComponet.prototype.updateRender = function (callback) {
+    RouterComponet.prototype.updateRender = function () {
         var _this = this;
         this.setRouter();
-        _getActionResult(this.name, this.path, this, function (view) {
+        this.path && _getActionResult(this.name, this.path, this, function (view) {
             if (view) {
                 _this.render = _this.$render(view);
                 _this.$update();
             }
-            callback();
         });
     };
     RouterComponet.prototype.setRouter = function () {
@@ -436,10 +435,7 @@ var RouterComponet = (function (_super) {
         this.name && _setRouter(this.name, this);
     };
     RouterComponet.prototype.change = function (path) {
-        var _this = this;
-        this.updateRender(function () {
-            _super.prototype.onChanged.call(_this);
-        });
+        this.updateRender();
     };
     RouterComponet.prototype.onDispose = function () {
         this.name && _removeRouter(this.name);
@@ -476,7 +472,7 @@ var MvcBrowser = (function (_super) {
         _rootLoactionDef = cmpx.VMManager.getVM(controllerDef.prototype, 'location');
         _routerAction = _buildAction(controllerDef, null, appView);
         //appView.prototype.$controller
-        var app = _root = new appView();
+        var app = View.RootView = _root = new appView();
         _super.prototype.boot.call(this, app);
     };
     return MvcBrowser;
