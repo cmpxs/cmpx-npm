@@ -203,7 +203,7 @@ _cmdDecodeAttrRegex = /\$\(\$(.+?)\$\)\$/gm, _backTextTag = function (tmpl) {
     });
 }, 
 //查找分析tag和cmd
-_tagInfoRegex = /\<\s*(\/*)\s*([^<>\s]+)\s*([^<>]*?)(\/*)\s*\>|\{\{\s*(\/*)\s*([^\s\{\}]+)\s*(.*?)(\/*)\}\}/gim, _makeTagInfos = function (tmpl) {
+_tagInfoRegex = /\<\s*(\/*)\s*([^<>\s/]+)\s*([^<>]*?)(\/*)\s*\>|\{\{\s*(\/*)\s*([^\s\{\}]+)\s*(.*?)(\/*)\}\}/gim, _makeTagInfos = function (tmpl) {
     var lastIndex = 0, list = [];
     tmpl = _makeTextTag(tmpl);
     tmpl = htmlDef_1.HtmlDef.handleTagContent(tmpl);
@@ -683,7 +683,7 @@ var _tmplName = '__tmpl__', _getComponetTmpl = function (componet, id) {
 }, _textContentName, _setTextNode = function (textNode, content) {
     if (!_textContentName)
         _textContentName = ('textContent' in textNode) ? 'textContent' : 'nodeValue';
-    textNode[_textContentName] = content;
+    textNode[_textContentName] = cmpxLib_1.CmpxLib.isString(content) ? cmpxLib_1.CmpxLib.decodeHtml(content) : content;
 };
 var CompileRender = (function () {
     /**
@@ -725,7 +725,7 @@ var CompileRender = (function () {
         if (componetDef) {
             isNewComponet = true;
             componet = componetDef instanceof componet_1.Componet ? componetDef : new componetDef();
-            componet.$name = name;
+            //componet.$name = name;
             componet.$subject = newSubject;
             componet.$parentElement = parentElement;
             componet.$parent = parentComponet;
@@ -1298,7 +1298,7 @@ var Compile = (function () {
                         //如果有数据
                         if (datas) {
                             //如果不是数组，转为一个数组
-                            isArray || (datas = [datas]);
+                            isArray || (datas = datas ? [datas] : []);
                             var count_1 = datas.length;
                             if (syncFn) {
                                 //同步模式，同步性生成view
@@ -1558,9 +1558,10 @@ var Compile = (function () {
             contextFn && contextFn.call($componet, $componet, element, subject, param);
         };
     };
-    Compile.includeRender = function (context, contextFn, componet, parentElement, insertTemp, subject, param) {
-        if (!context || subject.isRemove)
+    Compile.includeRender = function (context, contextFn, componet, parentElement, insertTemp, subject, param, contextFrom) {
+        if (!(context || contextFrom) || subject.isRemove)
             return;
+        contextFrom && (context = contextFrom.call(componet));
         if (cmpxLib_1.CmpxLib.isString(context)) {
             var tmpl = _getComponetTmpl(componet, context);
             if (tmpl) {
@@ -1680,7 +1681,7 @@ var _buildCompileFn = function (tagInfos) {
         '$index = ', itemName, '_index = index, $count = ', itemName, '_count = count;\n',
         '$last = ', itemName, '_last = (count - index == 1), $first = ', itemName, '_first = (index == 0), $odd = ', itemName, '_odd = (index % 2 == 0), $even = ', itemName, '_even = !$odd;\n',
         '};\n',
-        'setForVar.call(componet, item, $count, $index);'
+        'setForVar.call(componet, ', itemName, ', $count, $index);'
     ].join('');
     outList.push(str);
 }, _buildCompileFnContent = function (tagInfos, outList, varNameList, preInsert, inclue) {
@@ -1784,17 +1785,18 @@ var _buildCompileFn = function (tagInfos) {
                     preInsert = true;
                     break;
                 case 'include':
-                    var incAttr = cmpxLib_1.CmpxLib.arrayToObject(tag.attrs, 'name'), incTmpl = incAttr['tmpl'], incParam = incAttr['param'] ? incAttr['param'].value : 'null', incRender = incAttr['render'], hasIncChild = tag.children && tag.children.length > 0;
-                    incParam = incParam == 'null' ? incParam : ('function(){ return ' + incParam + ';}');
-                    incRender && (incRender = 'function(){ return ' + incRender.value + '}');
+                    var incAttr = cmpxLib_1.CmpxLib.arrayToObject(tag.attrs, 'name'), incTmpl = incAttr['tmpl'], incTmplFrom = incAttr['from'], incParam = incAttr['param'] ? incAttr['param'].value : 'null', incRender = incAttr['render'], hasIncChild = tag.children && tag.children.length > 0;
+                    incParam = incParam == 'null' ? incParam : ('function(){ return ' + incParam + '; }');
+                    incRender && (incRender = 'function(){ return ' + incRender.value + '; }');
                     var context_1 = incRender ? incRender : ('"' + (incTmpl ? _escapeBuildString(incTmpl.value) : '') + '"');
+                    var contextForm = incTmplFrom ? 'function(){ return ' + incTmplFrom.value + '; }' : 'null';
                     if (hasIncChild) {
                         outList.push('__includeRender(' + context_1 + ', function (componet, element, subject) {');
                         _buildCompileFnContent(tag.children, outList, varNameList, preInsert);
-                        outList.push('}, componet, element, ' + _getInsertTemp(preInsert) + ', subject,  ' + incParam + ');');
+                        outList.push('}, componet, element, ' + _getInsertTemp(preInsert) + ', subject, ' + incParam + ', ' + contextForm + ');');
                     }
                     else
-                        outList.push('__includeRender(' + context_1 + ', null, componet, element, ' + _getInsertTemp(preInsert) + ', subject,  ' + incParam + ');');
+                        outList.push('__includeRender(' + context_1 + ', null, componet, element, ' + _getInsertTemp(preInsert) + ', subject, ' + incParam + ', ' + contextForm + ');');
                     preInsert = true;
                     break;
                 case 'tmpl':

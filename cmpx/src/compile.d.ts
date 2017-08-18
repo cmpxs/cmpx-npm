@@ -145,6 +145,6 @@ export declare class Compile {
     static updateRender(fn: Function, componet: Componet, element: HTMLElement, subject: CompileSubject): void;
     static ifRender(ifFun: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, trueFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, falseFn: (componet: Componet, element: HTMLElement, subject: CompileSubject) => any, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, isX: boolean): void;
     static tmplRender(id: any, componet: Componet, parentElement: HTMLElement, subject: CompileSubject, contextFn: (componet: Componet, element: HTMLElement, subject: CompileSubject, param: any) => void): void;
-    static includeRender(context: any, contextFn: Function, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, param: Function): void;
+    static includeRender(context: any, contextFn: Function, componet: Componet, parentElement: HTMLElement, insertTemp: boolean, subject: CompileSubject, param: Function, contextFrom: any): void;
     static renderComponet(componetDef: Componet | typeof Componet, refNode: Node, attrs: ICreateElementAttr[], complieEnd?: (newSubject: CompileSubject, refComponet: Componet) => void, parentComponet?: Componet, subject?: CompileSubject, contextFn?: (component: Componet, element: HTMLElement, subject: CompileSubject, isComponet: boolean) => void): void;
 }
