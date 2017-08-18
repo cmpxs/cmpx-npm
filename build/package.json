@@ -1,6 +1,6 @@
 {
   "name": "cmpx-build",
-  "version": "1.0.0-deta7",
+  "version": "1.0.0-deta8",
   "description": "cmpx-build",
   "main": "index.js",
   "scripts": {
